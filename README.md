@@ -5,11 +5,26 @@ Memory System for Trae IDE - 项目级记忆管理系统
 ## 特性
 
 - 🎯 **项目级记忆** - 每个项目独立的记忆空间
-- 🔍 **全文搜索** - 支持中文分词 (jieba) + FTS5
+- 🔍 **全文搜索** - 支持中文分词 (jieba) + FTS5 + BM25 排序
 - 🌐 **全局/项目分层** - 像 Poetry 一样灵活
 - 📦 **模板化初始化** - minimal / standard / full
 - ⚙️ **配置继承** - 支持 extends 全局配置
 - 📝 **规则文件** - 自动生成 IDE 可读规则
+- 🔒 **加密备份** - 本地加密存储
+- ⏮️ **版本控制** - Git-like 版本管理
+- 🖥️ **双 IDE 支持** - 适配 Trae IDE + VS Code
+- ⚡ **零依赖** - 只需 SQLite，开箱即用
+
+## 对比 OpenClaw
+
+| 特性 | trae-memory | OpenClaw |
+|:---|:---|:---|
+| 额外依赖 | **无** (零依赖) | 需要 sqlite-vec |
+| 安装 | `pip install trae-memory` | 需配置向量引擎 |
+| 搜索 | FTS5 + BM25 | vector + BM25 + MMR |
+| 向量搜索 | 后续版本支持 | ✅ |
+
+**trae-memory 优势**：开箱即用，无需安装额外数据库引擎！
 
 ## 安装
 
