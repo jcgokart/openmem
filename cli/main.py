@@ -364,6 +364,51 @@ def cmd_page(args):
     memory.close()
 
 
+def cmd_organize(args):
+    """整理会议纪要"""
+    from features.organizer import Organizer, format_conversation, build_prompt, format_summary_md, parse_summary
+
+    organizer = Organizer()
+
+    if args.session:
+        messages = organizer.get_raw_messages(session_id=args.session)
+    elif args.date:
+        messages = organizer.get_raw_messages(date=args.date)
+    else:
+        messages = organizer.get_recent_raw(days=args.days)
+
+    if not messages:
+        print("没有找到原始记录")
+        return
+
+    print(f"📝 共 {len(messages)} 条原始消息")
+
+    conversation = format_conversation(messages)
+
+    prompt = build_prompt(conversation)
+    print("\n" + "=" * 50)
+    print("📋 整理 Prompt（复制到 LLM）：")
+    print("=" * 50)
+    print(prompt)
+    print("=" * 50)
+
+    print("\n💡 请将 LLM 返回的 JSON 粘贴到下方（直接回车跳过）：")
+    response = input("> ").strip()
+
+    if response:
+        summary = parse_summary(response)
+        summary.raw_count = len(messages)
+
+        if args.dry_run:
+            print("\n📄 预览纪要：")
+            print(format_summary_md(summary))
+        else:
+            filepath = organizer.save_summary(summary)
+            print(f"\n✅ 纪要已保存: {filepath}")
+    else:
+        print("\n⏭️ 跳过整理")
+
+
 def main():
     """主入口"""
     parser = argparse.ArgumentParser(
@@ -430,6 +475,13 @@ def main():
                            help='作用域')
     parser_page.add_argument('--project', help='项目路径')
     
+    # organize
+    parser_org = subparsers.add_parser('organize', help='整理会议纪要')
+    parser_org.add_argument('--date', help='日期 (YYYY-MM-DD，默认今天)')
+    parser_org.add_argument('--days', type=int, default=1, help='最近 N 天')
+    parser_org.add_argument('--session', help='指定会话 ID')
+    parser_org.add_argument('--dry-run', action='store_true', help='仅预览，不保存')
+    
     args = parser.parse_args()
     
     if not args.command:
@@ -443,6 +495,7 @@ def main():
         'search': cmd_search,
         'list': cmd_list,
         'page': cmd_page,
+        'organize': cmd_organize,
     }
     
     commands[args.command](args)
