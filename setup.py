@@ -32,7 +32,6 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "openmem=openmem.cli.main:main",
             "omem=openmem.cli.main:main",
         ],
     },

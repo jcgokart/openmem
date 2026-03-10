@@ -60,6 +60,19 @@ OpenMem is a project-level memory system for AI-powered development. It provides
 | `organizer.py` | Meeting minutes organizer |
 | `llm.py` | LLM client for auto-summarize |
 
+### Data Directory
+
+- **data/vocabularies.py**: Custom vocabulary for jieba tokenization
+  - Technical terms, framework names, etc.
+  - Extensible for domain-specific needs
+
+### Skills Directory
+
+- **skills/openmem-skill/**: AI Assistant integration
+  - skill.yaml: Skill definition for OpenClaw/Trae
+  - openmem_skill.py: Python implementation
+  - Enables AI assistants to use OpenMem as memory backend
+
 ## Data Model
 
 ### Memory Table

@@ -222,21 +222,42 @@ omem status -v
 ```python
 from openmem import MemoryManager
 
-# Auto-select (project first)
+# Auto-select (project first, fallback to global)
 memory = MemoryManager()
+
+# Explicit project path
+memory = MemoryManager(project_path="/path/to/project")
+
+# Global memory only
+memory = MemoryManager(project_path=None)
 
 # Add memory
 memory_id = memory.add(
     content="Use JWT for authentication",
     type="decision",
-    tags=["auth", "security"]
+    tags=["auth", "security"],
+    priority=8
 )
 
-# Search
-results = memory.search("auth", scope="both")
+# Search with filters
+results = memory.search(
+    query="authentication",
+    scope="project",      # "project" | "global" | "both"
+    memory_type="decision",
+    tags=["auth"],
+    limit=10
+)
 
-# List
-memories = memory.list(type="decision")
+# List memories
+memories = memory.list(
+    memory_type="decision",
+    tags=["auth"],
+    limit=50
+)
+
+# Update and delete
+memory.update(memory_id, content="New content")
+memory.delete(memory_id)
 
 memory.close()
 ```
@@ -292,7 +313,7 @@ OpenMem 存的是你的：
 - 🔒 加密备份
 - ⏮️ 版本控制
 - 🖥️ 支持 Trae IDE + VS Code
-- ⚡ 零依赖（仅 SQLite）
+- ⚡ 最小依赖（SQLite + jieba）
 
 ### 安装
 
