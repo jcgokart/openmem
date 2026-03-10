@@ -9,6 +9,8 @@ from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass
 from enum import Enum
 
+from memory.data.constants import TRIGGER_KEYWORDS, NEGATIONS, INTENSIFIERS, TECH_WORDS
+
 
 class TriggerType(Enum):
     """Trigger type enumeration"""
@@ -35,46 +37,24 @@ class SmartTrigger:
     
     def __init__(self):
         self.key_verbs = {
-            TriggerType.DECISION: [
-                "决定", "选择", "采用", "实施", "确定", "选定", "敲定",
-                "拍板", "定下", "选定", "确定", "选择"
-            ],
-            TriggerType.MILESTONE: [
-                "完成", "实现", "达成", "上线", "发布", "交付", "验收",
-                "结束", "收尾", "完工", "竣工"
-            ],
-            TriggerType.IMPORTANT: [
-                "重要", "关键", "核心", "注意", "记住", "务必", "必须",
-                "紧急", "优先", "重点"
-            ],
-            TriggerType.ARCHIVE: [
-                "总结", "归档", "结束", "记录一下", "保存", "存档",
-                "整理", "归纳", "汇总", "记录"
-            ]
+            TriggerType.DECISION: TRIGGER_KEYWORDS["decision"]["zh"] + TRIGGER_KEYWORDS["decision"]["en"],
+            TriggerType.MILESTONE: TRIGGER_KEYWORDS["milestone"]["zh"] + TRIGGER_KEYWORDS["milestone"]["en"],
+            TriggerType.IMPORTANT: TRIGGER_KEYWORDS["important"]["zh"] + TRIGGER_KEYWORDS["important"]["en"],
+            TriggerType.ARCHIVE: TRIGGER_KEYWORDS["archive"]["zh"] + TRIGGER_KEYWORDS["archive"]["en"],
         }
         
-        self.negations = [
-            "不", "没", "无", "非", "未", "别", "莫", "勿",
-            "不要", "不用", "无需", "不必", "没有", "不是"
-        ]
+        self.negations = NEGATIONS
         
         self.intensifiers = {
-            "enhance": ["非常", "特别", "极其", "相当", "十分", "格外"],
-            "reduce": ["稍微", "略微", "有点", "有些", "比较", "还算"]
+            "enhance": INTENSIFIERS["enhance"]["zh"] + INTENSIFIERS["enhance"]["en"],
+            "reduce": INTENSIFIERS["reduce"]["zh"] + INTENSIFIERS["reduce"]["en"],
         }
         
         self._load_user_dict()
     
     def _load_user_dict(self):
         """Load user dictionary"""
-        tech_words = [
-            "微服务", "单体架构", "分布式", "容器化", "Kubernetes",
-            "Docker", "CI/CD", "DevOps", "敏捷开发", "Scrum",
-            "RESTful", "GraphQL", "gRPC", "WebSocket", "Redis",
-            "PostgreSQL", "MongoDB", "Elasticsearch", "Kafka"
-        ]
-        
-        for word in tech_words:
+        for word in TECH_WORDS:
             jieba.add_word(word, tag='n')
     
     def analyze(self, text: str) -> TriggerResult:
@@ -213,15 +193,21 @@ if __name__ == "__main__":
     
     test_cases = [
         ("决定使用 SQLite 作为存储引擎", True),
+        ("we decided to use PostgreSQL", True),
         ("完成了第一阶段开发", True),
+        ("completed first phase", True),
         ("这个决策非常重要", True),
+        ("very important decision", True),
         ("记录一下今天的进度", True),
+        ("take a note", True),
         ("这个决策不重要", False),
+        ("not important", False),
         ("不要记录这个", False),
+        ("dont record this", False),
         ("稍微有点想法", False),
+        ("somewhat think", False),
         ("今天天气不错", False),
-        ("我决定不采用这个方案", True),
-        ("这个方案非常重要，必须记录", True),
+        ("the weather is nice", False),
     ]
     
     print("\n【Test Results】")
