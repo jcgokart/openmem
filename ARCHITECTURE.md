@@ -1,88 +1,83 @@
-# ARCHITECTURE - 架构设计
+# Architecture
 
-## 整体架构
+## Overview
+
+trae-memory is a project-level memory system for AI-powered development. It provides persistent memory storage with full-text search, version control, and IDE integration.
+
+## Architecture Diagram
 
 ```
-┌─────────────────────────────────────────┐
-│              CLI 层                     │
-│         (memory add/search/list)        │
-└─────────────────┬───────────────────────┘
-                  │
-┌─────────────────▼───────────────────────┐
-│           MemoryManager                  │
-│    (核心管理器：全局/项目分层)            │
-└─────────────────┬───────────────────────┘
-                  │
-┌─────────────────▼───────────────────────┐
-│          StorageBackend                   │
-│         (SQLite 存储后端)                 │
-└─────────────────┬───────────────────────┘
-                  │
-┌─────────────────▼───────────────────────┐
-│           SQLite + FTS5                   │
-│        (全文搜索 + BM25 排序)            │
-└─────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                        CLI Layer                            │
+│              (cli/main.py - argparse)                      │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────────┐
+│                     Core Layer                              │
+│        (core/manager.py - MemoryManager)                   │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────────┐
+│                   Storage Layer                             │
+│      (storage/sqlite.py - SQLiteStorage)                   │
+│              FTS5 + BM25 Search                             │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────────┐
+│                  Feature Modules                            │
+│  ┌────────────┐ ┌──────────┐ ┌─────────┐ ┌──────────────┐ │
+│  │ trigger.py │ │search.py │ │version.py│ │ encryption.py │ │
+│  │  (Smart    │ │  (BM25)  │ │ (Git-   │ │  (Fernet +   │ │
+│  │  Trigger)  │ │          │ │  like)  │ │   PBKDF2)    │ │
+│  └────────────┘ └──────────┘ └─────────┘ └──────────────┘ │
+└─────────────────────────────────────────────────────────────┘
 ```
 
----
+## Module Description
 
-## 核心模块
+### Core Layer
 
-### 1. CLI 层 (`cli/main.py`)
+- **MemoryManager**: Main interface for all memory operations
+  - Auto-detect project/global memory
+  - CRUD operations
+  - Search, list, pagination
 
-命令行入口，负责解析命令并调用 Manager。
+### Storage Layer
 
-### 2. MemoryManager (`core/manager.py`)
+- **SQLiteStorage**: Database operations
+  - WAL mode for concurrent access
+  - FTS5 full-text search
+  - BM25 ranking algorithm
 
-核心管理器，负责：
-- 全局/项目分层管理
-- 记忆的 CRUD 操作
-- 搜索和分页
+### Feature Modules
 
-### 3. StorageBackend (`storage_sqlite.py`)
+| Module | Function |
+|:---|:---|
+| `trigger.py` | Auto-detect memory type using NLP |
+| `search.py` | BM25 ranking implementation |
+| `version.py` | Git-like version control |
+| `encryption.py` | Encrypted backup (Fernet + PBKDF2) |
+| `organizer.py` | Meeting minutes organizer |
+| `llm.py` | LLM client for auto-summarize |
 
-SQLite 存储后端，负责：
-- 数据库连接（WAL 模式）
-- FTS5 全文索引
-- BM25 搜索排序
+## Data Model
 
-### 4. 配置系统 (`core/config.py`)
+### Memory Table
 
-- 全局配置 (`~/.memory/config.yaml`)
-- 项目配置 (`.memory/config.yaml`)
-- 配置继承 (`extends`)
+```sql
+CREATE TABLE memories (
+    id INTEGER PRIMARY KEY,
+    content TEXT NOT NULL,
+    type TEXT DEFAULT 'knowledge',
+    tags TEXT,
+    priority INTEGER DEFAULT 5,
+    scope TEXT DEFAULT 'project',
+    created_at TEXT,
+    updated_at TEXT
+);
+```
 
-### 5. 智能触发 (`features/trigger.py`)
-
-- NLP 分析（jieba 分词）
-- 触发类型检测
-- 置信度计算
-
-### 6. 加密备份 (`features/encryption.py`)
-
-- Fernet 加密
-- 原子备份 (VACUUM INTO)
-
----
-
-## 数据模型
-
-### 记忆表 (memories)
-
-| 字段 | 类型 | 说明 |
-|:---|:---|:---|
-| id | INTEGER | 主键 |
-| type | TEXT | 类型 (decision/milestone/issue/knowledge) |
-| content | TEXT | 内容 |
-| metadata | TEXT | JSON 元数据 |
-| tags | TEXT | 标签 (JSON 数组) |
-| priority | INTEGER | 优先级 0-10 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
-| expires_at | DATETIME | 过期时间 |
-| version | INTEGER | 版本号 |
-
-### FTS5 虚拟表
+### FTS5 Virtual Table
 
 ```sql
 CREATE VIRTUAL TABLE memories_fts USING fts5(
@@ -93,69 +88,33 @@ CREATE VIRTUAL TABLE memories_fts USING fts5(
 );
 ```
 
----
+## Search Flow
 
-## 分层存储
+1. User inputs query
+2. BM25 calculates relevance score
+3. Results ranked by score
+4. Highlight matched terms
 
-```
-全局记忆:  ~/.memory/
-           ├── config.yaml    # 全局配置
-           └── memory.db      # 全局记忆库
-
-项目记忆:  .memory/
-           ├── config.yaml    # 项目配置（继承全局）
-           ├── memory.db      # 项目记忆库
-           └── rules/         # 生成的规则文件
-               └── project.md
-```
-
----
-
-## 搜索机制
-
-### BM25 排序
-
-BM25 是一种基于词频的搜索排序算法：
+## Config Inheritance
 
 ```
-score(Q, D) = Σ IDF(qi) * (f(qi,D) * (k1+1)) / 
-              (f(qi,D) + k1 * (1 - b + b * |D|/avgdl))
+~/.memory/config.yaml (global)
+    │
+    ├── extends: null
+    │
+    └── project/config.yaml
+            │
+            └── extends: ~/.memory/config.yaml
 ```
 
-优点：
-- 不依赖向量模型
-- 精确匹配关键词
-- 支持中文分词
+Features inherited:
+- memory_types definitions
+- storage settings
+- search preferences
 
----
+## IDE Integration
 
-## 配置继承
+- **Trae IDE**: `.memory/rules/project.md`
+- **VS Code**: `.vscode/trae-memory.md`
 
-```yaml
-# ~/.memory/config.yaml (全局)
-version: 1
-storage:
-  wal_mode: true
-  busy_timeout: 30000
-
-# .memory/config.yaml (项目)
-extends: ~/.memory/config.yaml  # 继承全局配置
-priority: 5                     # 覆盖或扩展
-```
-
----
-
-## 扩展性
-
-### 添加新的存储后端
-
-```python
-class StorageBackend(ABC):
-    @abstractmethod
-    def add_message(self, message: Dict) -> int: ...
-    
-    @abstractmethod
-    def search(self, query: str, limit: int) -> List[Dict]: ...
-```
-
-只需实现抽象方法即可替换存储后端。
+Rules are auto-generated from memory content.

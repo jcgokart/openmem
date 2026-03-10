@@ -1,76 +1,76 @@
 # trae-memory
 
-Memory System for Trae IDE - 项目级记忆管理系统
+Project-level memory system for AI-powered development.
 
-## 特性
+## Features
 
-- 🎯 **项目级记忆** - 每个项目独立的记忆空间
-- 🔍 **全文搜索** - 支持中文分词 (jieba) + FTS5 + BM25 排序
-- 🌐 **全局/项目分层** - 像 Poetry 一样灵活
-- 📦 **模板化初始化** - minimal / standard / full
-- ⚙️ **配置继承** - 支持 extends 全局配置
-- 📝 **规则文件** - 自动生成 IDE 可读规则
-- 🔒 **加密备份** - 本地加密存储
-- ⏮️ **版本控制** - Git-like 版本管理
-- 🖥️ **双 IDE 支持** - 适配 Trae IDE + VS Code
-- ⚡ **零依赖** - 只需 SQLite，开箱即用
+- 🎯 **Project-level Memory** - Independent memory space per project
+- 🔍 **Full-text Search** - Chinese tokenization (jieba) + FTS5 + BM25 ranking
+- 🌐 **Global/Project Layers** - Flexible like Poetry
+- 📦 **Template Init** - minimal / standard / full
+- ⚙️ **Config Inheritance** - extends global config
+- 📝 **Rules Generation** - Auto-generate IDE-readable rules
+- 🔒 **Encrypted Backup** - Local encrypted storage
+- ⏮️ **Version Control** - Git-like versioning
+- 🖥️ **Dual IDE Support** - Trae IDE + VS Code
+- ⚡ **Zero Dependencies** - SQLite only, ready out of the box
 
-## 对比 OpenClaw
+## Why trae-memory?
 
-| 特性 | trae-memory | OpenClaw |
+| Feature | trae-memory | OpenClaw |
 |:---|:---|:---|
-| 额外依赖 | **无** (零依赖) | 需要 sqlite-vec |
-| 安装 | `pip install trae-memory` | 需配置向量引擎 |
-| 搜索 | FTS5 + BM25 | vector + BM25 + MMR |
-| 向量搜索 | 后续版本支持 | ✅ |
+| Extra Dependencies | **None** | Requires sqlite-vec |
+| Installation | `pip install trae-memory` | Requires vector engine |
+| Search | FTS5 + BM25 | vector + BM25 + MMR |
+| Vector Search | Future support | ✅ |
 
-**trae-memory 优势**：开箱即用，无需安装额外数据库引擎！
+**trae-memory advantage**: Works out of the box, no extra database engine needed!
 
-## 安装
+## Installation
 
 ```bash
 pip install trae-memory
 ```
 
-或开发模式：
+Or development mode:
 
 ```bash
 pip install -e .
 ```
 
-## 快速开始
+## Quick Start
 
-### 初始化
+### Initialize
 
 ```bash
-# 项目级 Memory
+# Project-level Memory
 memory init
 
-# 全局 Memory（所有项目共享）
+# Global Memory (shared across projects)
 memory init --global
 
-# 选择模板
+# Select template
 memory init --template=standard
 memory init --template=full
 
-# 非交互模式
+# Non-interactive mode
 memory init -y
 ```
 
-### 基本使用
+### Basic Usage
 
 ```bash
-# 添加记忆
-memory add "使用 JWT 认证" --type decision --tags auth,security
+# Add memory
+memory add "Use JWT for authentication" --type decision --tags auth,security
 
-# 搜索记忆
-memory search 认证
-memory search 认证 --scope both
+# Search
+memory search auth
+memory search auth --scope both
 
-# 列出记忆
+# List
 memory list --type decision
 
-# 查看状态
+# Status
 memory status
 memory status -v
 ```
@@ -80,55 +80,55 @@ memory status -v
 ```python
 from memory import MemoryManager
 
-# 自动选择（项目优先）
+# Auto-select (project first)
 memory = MemoryManager()
 
-# 添加记忆
+# Add memory
 memory_id = memory.add(
-    content="使用 JWT 认证",
+    content="Use JWT for authentication",
     type="decision",
     tags=["auth", "security"]
 )
 
-# 搜索
-results = memory.search("认证", scope="both")
+# Search
+results = memory.search("auth", scope="both")
 
-# 列出
+# List
 memories = memory.list(type="decision")
 
 memory.close()
 ```
 
-## 目录结构
+## Directory Structure
 
 ```
-.memory/                    # 项目 Memory
-├── config.yaml            # 配置文件
-├── memory.db              # SQLite 数据库
+.memory/                    # Project Memory
+├── config.yaml            # Config
+├── memory.db              # SQLite database
 ├── rules/
-│   └── project.md        # IDE 规则
-├── sessions/             # 会话导出
-├── knowledge/            # 知识导出
-└── backups/              # 备份
+│   └── project.md        # IDE rules
+├── sessions/             # Session exports
+├── knowledge/            # Knowledge exports
+└── backups/              # Backups
 
-~/.memory/                 # 全局 Memory
+~/.memory/                 # Global Memory
 ├── config.yaml
-├── memory.db
+├── memory.yaml
 └── ...
 ```
 
-## 配置
+## Config
 
 ```yaml
 # .memory/config.yaml
-extends: ~/.memory/config.yaml  # 继承全局配置
+extends: ~/.memory/config.yaml
 
 project:
   name: "my-project"
 
 memory_types:
   decision:
-    sync_to_global: true   # 同步到全局
+    sync_to_global: true
   milestone:
     sync_to_global: false
 
@@ -142,37 +142,55 @@ search:
   tokenizer: jieba
 ```
 
-## 命令
+## Commands
 
-| 命令 | 说明 |
+| Command | Description |
 |:---|:---|
-| `memory init` | 初始化项目 Memory |
-| `memory init --global` | 初始化全局 Memory |
-| `memory init --template=standard` | 选择模板 |
-| `memory status` | 查看状态 |
-| `memory status -v` | 详细信息 |
-| `memory add "内容"` | 添加记忆 |
-| `memory search 关键词` | 搜索 |
-| `memory list` | 列出 |
-| `memory page` | 分页 |
+| `memory init` | Initialize project Memory |
+| `memory init --global` | Initialize global Memory |
+| `memory init --template=standard` | Select template |
+| `memory status` | Show status |
+| `memory status -v` | Verbose |
+| `memory add "content"` | Add memory |
+| `memory search query` | Search |
+| `memory list` | List memories |
+| `memory page` | Paginate |
 
-## 记忆类型
+## Memory Types
 
-| 类型 | 说明 | 同步到全局 |
+| Type | Description | Sync to Global |
 |:---|:---|:---|
-| decision | 重要决策 | 可选 |
-| milestone | 里程碑 | 可选 |
-| issue | 问题记录 | 否 |
-| knowledge | 知识文档 | 是 |
-| session | 会话记录 | 否 |
-| archive | 归档内容 | 否 |
+| decision | Important decisions | Optional |
+| milestone | Milestones | Optional |
+| issue | Issue records | No |
+| knowledge | Knowledge docs | Yes |
+| session | Session records | No |
+| archive | Archived content | No |
 
-## 相关文档
+## Related Docs
 
-- [QUICKSTART.md](QUICKSTART.md) - 5分钟快速入门
-- [USAGE.md](USAGE.md) - 详细用法
-- [ARCHITECTURE.md](ARCHITECTURE.md) - 架构设计
+- [QUICKSTART.md](QUICKSTART.md) - 5-minute quick start
+- [USAGE.md](USAGE.md) - Detailed usage
+- [ARCHITECTURE.md](ARCHITECTURE.md) - Architecture design
 
 ## License
 
 MIT
+
+---
+
+# 中文简介
+
+trae-memory 是专为 AI 开发设计的项目级记忆系统。
+
+**核心特点：**
+- 零依赖，开箱即用
+- 支持中文分词搜索
+- 项目级 + 全局分层
+- 自动生成 IDE 规则
+- 支持 Trae IDE 和 VS Code
+
+**适用场景：**
+- 记录技术决策和约束
+- 知识沉淀和复用
+- 项目规范统一

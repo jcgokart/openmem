@@ -1,105 +1,105 @@
-# USAGE - 详细用法
+# USAGE - Detailed Usage Guide
 
-## 命令行 (CLI)
+## CLI Commands
 
-### init - 初始化
+### init - Initialize
 
 ```bash
-# 交互式初始化
+# Interactive mode
 memory init
 
-# 非交互模式
+# Non-interactive mode
 memory init -y
 
-# 指定项目路径
+# Specify project path
 memory init /path/to/project
 
-# 全局初始化（所有项目共享）
+# Global Memory (shared across projects)
 memory init --global
 
-# 选择模板
-memory init --template=minimal   # 最小配置
-memory init --template=standard  # 标准配置
-memory init --template=full      # 完整配置
+# Select template
+memory init --template=minimal   # Minimal config
+memory init --template=standard  # Standard config
+memory init --template=full      # Full config
 
-# 指定项目名称
+# Specify project name
 memory init --project-name myapp
 ```
 
-### add - 添加记忆
+### add - Add Memory
 
 ```bash
-# 自动检测类型（推荐）
-memory add "我们决定使用 PostgreSQL"
+# Auto-detect type (recommended)
+memory add "We decided to use PostgreSQL"
 
-# 指定类型
-memory add "完成了登录功能" --type milestone
+# Specify type
+memory add "Completed login feature" --type milestone
 
-# 添加标签
-memory add "使用 JWT 认证" --tags auth,jwt
+# Add tags
+memory add "Use JWT for authentication" --tags auth,jwt
 
-# 指定优先级 (0-10)
-memory add "重要决策" --priority 8
+# Specify priority (0-10)
+memory add "Important decision" --priority 8
 
-# 指定作用域
-memory add "全局知识" --scope global
+# Specify scope
+memory add "Global knowledge" --scope global
 
-# 完整示例
-memory add "使用 Redis 缓存" --type knowledge --tags redis,cache --priority 5
+# Full example
+memory add "Use Redis for caching" --type knowledge --tags redis,cache --priority 5
 ```
 
-**类型说明：**
-| 类型 | 说明 | 触发关键词 |
+**Type Reference:**
+| Type | Description | Trigger Keywords |
 |:---|:---|:---|
-| `decision` | 决策 | 决定、采用、实施 |
-| `milestone` | 里程碑 | 完成、发布、上线 |
-| `issue` | 问题 | 修复、解决、Bug |
-| `knowledge` | 知识 | 技术、文档、API |
+| `decision` | Decisions | decide, adopt, implement |
+| `milestone` | Milestones | complete, release, launch |
+| `issue` | Issues | fix, resolve, bug |
+| `knowledge` | Knowledge | tech, doc, API |
 
-### search - 搜索
+### search - Search
 
 ```bash
-# 关键词搜索
+# Keyword search
 memory search PostgreSQL
 
-# 限制结果数量
-memory search 数据库 --limit 5
+# Limit results
+memory search database --limit 5
 
-# 标签搜索
+# Tag search
 memory search --tag auth
 
-# 项目路径
+# Project path
 memory search JWT --project /path/to/project
 ```
 
-### list - 列表
+### list - List
 
 ```bash
-# 所有记忆
+# All memories
 memory list
 
-# 按类型筛选
+# Filter by type
 memory list --type decision
 memory list --type milestone
 
-# 限制数量
+# Limit
 memory list --limit 50
 ```
 
-### page - 分页
+### page - Pagination
 
 ```bash
-# 第一页，每页20条
+# First page, 20 items per page
 memory page --page 0
 
-# 指定页码和每页数量
+# Specific page and size
 memory page --page 2 --page-size 50
 ```
 
-### status - 状态
+### status - Status
 
 ```bash
-# 查看 Memory 状态
+# Show Memory status
 memory status
 ```
 
@@ -107,64 +107,64 @@ memory status
 
 ## Python API
 
-### 基本使用
+### Basic Usage
 
 ```python
 from memory import MemoryManager
 
-# 初始化（项目级）
+# Project-level
 memory = MemoryManager(project_path="/path/to/project")
 
-# 或全局
+# Or global
 memory = MemoryManager()
 ```
 
-### 添加记忆
+### Add Memory
 
 ```python
-# 添加
+# Add
 memory_id = memory.add(
-    content="我们决定使用 PostgreSQL",
+    content="We decided to use PostgreSQL",
     type="decision",
-    tags=["数据库", "后端"],
+    tags=["database", "backend"],
     priority=5
 )
 ```
 
-### 搜索
+### Search
 
 ```python
-# 关键词搜索
+# Keyword search
 results = memory.search("PostgreSQL")
 
-# 标签搜索
+# Tag search
 results = memory.search_by_tags(["auth"])
 ```
 
-### 列表
+### List
 
 ```python
-# 所有
+# All
 results = memory.list()
 
-# 按类型
+# By type
 results = memory.list(type="decision")
 
-# 分页
+# Paginate
 page = memory.page(page=0, page_size=20)
 ```
 
-### 更新/删除
+### Update/Delete
 
 ```python
-# 更新
-memory.update(memory_id, content="新内容", tags=["新标签"])
+# Update
+memory.update(memory_id, content="New content", tags=["new"])
 
-# 删除
+# Delete
 memory.delete(memory_id)
 ```
 
-### 关闭
+### Close
 
 ```python
 memory.close()
@@ -172,19 +172,19 @@ memory.close()
 
 ---
 
-## 智能触发
+## Smart Trigger
 
-添加记忆时，系统自动分析内容并检测类型：
+When adding memory, the system automatically analyzes content and detects type:
 
 ```bash
-memory add "我们决定用 JWT 做认证"
-# 输出：
-# 🔍 自动检测类型: decision (置信度: 0.70)
-#    关键词: 决定
-# ✅ 记忆已添加: ID=1
+memory add "We decided to use JWT for authentication"
+# Output:
+# 🔍 Auto-detected type: decision (confidence: 0.70)
+#    Keywords: 决定
+# ✅ Memory added: ID=1
 ```
 
-触发机制分析：
-- 关键词检测（决定、采用、完成等）
-- 否定词处理（"不重要"不会被误判）
-- 程度副词（"非常重要"置信度更高）
+Trigger mechanism analyzes:
+- Keyword detection (decide, adopt, complete, etc.)
+- Negation handling ("not important" won't be misdetected)
+- Intensifiers ("very important" has higher confidence)

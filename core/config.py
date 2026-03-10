@@ -1,5 +1,5 @@
 """
-Memory 配置类
+Memory Config Class
 支持配置继承：extends: ~/.memory/config.yaml
 """
 
@@ -11,9 +11,9 @@ from pathlib import Path
 
 class MemoryConfig:
     """
-    Memory 配置管理
+    Memory Config Manager
     
-    支持配置继承：
+    支持配置继承 / Supports config inheritance:
         # .memory/config.yaml
         extends: ~/.memory/config.yaml
     """
@@ -32,7 +32,7 @@ class MemoryConfig:
         self.config = self._load_config()
     
     def _load_config(self) -> Dict[str, Any]:
-        """加载配置（支持继承）"""
+        """加载配置（支持继承） / Load config with inheritance"""
         base_config = {
             'version': '2.0.0',
             'project': {'name': ''},
@@ -75,12 +75,12 @@ class MemoryConfig:
                         else:
                             base_config = self._merge_config(base_config, user_config)
             except Exception as e:
-                print(f"Warning: 加载配置失败: {e}")
+                print(f"Warning: Failed to load config: {e}")
         
         return base_config
     
     def _load_single_config(self, path: str) -> Dict[str, Any]:
-        """加载单个配置文件"""
+        """加载单个配置文件 / Load single config file"""
         try:
             with open(path, 'r', encoding='utf-8') as f:
                 return yaml.safe_load(f) or {}
@@ -88,7 +88,7 @@ class MemoryConfig:
             return {}
     
     def _merge_config(self, base: Dict, override: Dict) -> Dict:
-        """深度合并配置"""
+        """深度合并配置 / Deep merge config"""
         result = base.copy()
         for key, value in override.items():
             if key == 'extends':
@@ -100,7 +100,7 @@ class MemoryConfig:
         return result
     
     def get(self, key: str, default: Any = None) -> Any:
-        """获取配置值"""
+        """获取配置值 / Get config value"""
         keys = key.split('.')
         value = self.config
         for k in keys:
@@ -113,7 +113,7 @@ class MemoryConfig:
         return value
     
     def get_db_path(self) -> str:
-        """获取数据库路径"""
+        """获取数据库路径 / Get database path"""
         storage = self.config.get('storage', {})
         db_path = storage.get('path', 'memory.db')
         if not os.path.isabs(db_path):

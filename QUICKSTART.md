@@ -1,78 +1,78 @@
-# Quickstart - 5分钟上手
+# Quickstart - 5 minutes to get started
 
-## 安装
+## Install
 
 ```bash
 pip install trae-memory
 ```
 
-## 1. 初始化
+## 1. Initialize
 
 ```bash
-# 在当前项目初始化
+# Project-level Memory
 memory init
 
-# 或全局初始化（所有项目共享）
+# Global Memory (shared across projects)
 memory init --global
 ```
 
-## 2. 添加记忆
+## 2. Add Memory
 
 ```bash
-# 自动检测类型（推荐）
-memory add "我们决定使用 PostgreSQL 数据库"
+# Auto-detect type (recommended)
+memory add "We decided to use PostgreSQL database"
 
-# 指定类型
-memory add "完成了用户登录功能" --type milestone
+# Specify type
+memory add "Completed user login feature" --type milestone
 
-# 添加标签
-memory add "使用 JWT 做认证" --tags auth,jwt
+# Add tags
+memory add "Use JWT for authentication" --tags auth,jwt
 ```
 
-## 3. 搜索记忆
+## 3. Search
 
 ```bash
-# 关键词搜索
+# Keyword search
 memory search PostgreSQL
 
-# 标签搜索
+# Tag search
 memory search --tag auth
 ```
 
-## 4. 查看列表
+## 4. List
 
 ```bash
-# 查看所有记忆
+# List all memories
 memory list
 
-# 按类型筛选
+# Filter by type
 memory list --type decision
 ```
 
-## 5. 生成规则文件
+## 5. Generate Rules
 
 ```bash
-# 生成 .memory/rules/project.md
+# Generate .memory/rules/project.md
 memory rules
 ```
 
 ---
 
-## 常用命令
+## Common Commands
 
-| 命令 | 说明 |
+| Command | Description |
 |:---|:---|
-| `memory init` | 初始化 |
-| `memory add "内容"` | 添加记忆（自动检测类型） |
-| `memory search 关键词` | 搜索 |
-| `memory list` | 列表 |
-| `memory rules` | 生成规则文件 |
-| `memory backup` | 备份 |
-| `memory version` | 版本历史 |
+| `memory init` | Initialize |
+| `memory add "content"` | Add memory (auto-detect type) |
+| `memory search keyword` | Search |
+| `memory list` | List |
+| `memory rules` | Generate rules |
+| `memory backup` | Backup |
+| `memory version` | Version history |
 
 ---
 
-## 下一步
+## Next Steps
 
-- 查看 [USAGE.md](USAGE.md) 了解详细用法
-- 查看 [ARCHITECTURE.md](ARCHITECTURE.md) 了解架构设计
+- See [USAGE.md](USAGE.md) for detailed usage
+- See [ARCHITECTURE.md](ARCHITECTURE.md) for architecture design

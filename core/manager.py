@@ -1,6 +1,6 @@
 """
-Memory 核心管理器
-支持全局/项目分层，像 Poetry 一样灵活
+Memory Core Manager
+Supports Global/Project layers, flexible like Poetry
 """
 
 import os
@@ -12,31 +12,31 @@ from memory.storage import SQLiteStorage
 
 class MemoryManager:
     """
-    Memory 核心管理器
+    Memory Core Manager
     
-    支持全局/项目分层：
-    - 全局模式：所有项目共享 ~/.memory/
-    - 项目模式：仅当前项目可用 .memory/
-    - 混合模式：项目优先，没有则搜全局
+    Supports Global/Project layers:
+    - Global mode: All projects share ~/.memory/
+    - Project mode: Only current project available .memory/
+    - Hybrid mode: Project first, fallback to global
     
-    使用示例：
-        # 自动选择（项目优先）
+    Usage:
+        # Auto-select (project first)
         memory = MemoryManager()
         
-        # 明确指定项目
+        # Explicit project
         memory = MemoryManager(project_path="/path/to/project")
         
-        # 混合使用
+        # Hybrid
         global_memory = MemoryManager()
     """
     
     def __init__(self, project_path: str = None, global_first: bool = False):
         """
-        初始化 Memory 管理器
+        Initialize Memory Manager
         
         Args:
-            project_path: 项目路径，如果为 None 则使用全局
-            global_first: 搜索时是否全局优先
+            project_path: Project path, None for global
+            global_first: Search global first
         """
         self.project_path = project_path
         self.global_first = global_first
@@ -56,7 +56,7 @@ class MemoryManager:
     def add(self, content: str, type: str = "decision",
            tags: List[str] = None, metadata: dict = None,
            priority: int = 0, scope: str = "project") -> int:
-        """添加记忆"""
+        """Add memory"""
         if scope == "global":
             return self.global_store.create(type, content, metadata, tags, priority)
         else:
@@ -66,91 +66,114 @@ class MemoryManager:
                 return self.global_store.create(type, content, metadata, tags, priority)
     
     def get(self, memory_id: int, scope: str = "project") -> Optional[Dict[str, Any]]:
-        """获取记忆"""
+        """Get memory"""
         store = self._get_store(scope)
         return store.read(memory_id)
     
     def update(self, memory_id: int, content: str = None,
               metadata: dict = None, tags: List[str] = None,
               priority: int = None, scope: str = "project") -> bool:
-        """更新记忆"""
+        """Update memory"""
         store = self._get_store(scope)
         return store.update(memory_id, content, metadata, tags, priority)
     
     def delete(self, memory_id: int, scope: str = "project") -> bool:
-        """删除记忆"""
+        """Delete memory"""
         store = self._get_store(scope)
         return store.delete(memory_id)
     
-    def search(self, query: str, limit: int = 10, scope: str = "project") -> List[Dict[str, Any]]:
-        """搜索记忆"""
-        if scope == "both":
-            return self._search_both(query, limit)
-        
+    def list(self, type: str = None, scope: str = "project",
+            tags: List[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
+        """List memories"""
         store = self._get_store(scope)
-        return store.search(query, limit)
-    
-    def _search_both(self, query: str, limit: int) -> List[Dict[str, Any]]:
-        """混合搜索（项目优先，没有则搜全局）"""
-        if self.project_store:
-            results = self.project_store.search(query, limit)
-            if results:
-                return results
-        
-        if self.global_store:
-            return self.global_store.search(query, limit)
-        
-        return []
-    
-    def search_by_tags(self, tags: List[str], limit: int = 10, 
-                      scope: str = "project") -> List[Dict[str, Any]]:
-        """按标签搜索"""
-        store = self._get_store(scope)
-        return store.search_by_tags(tags, limit)
-    
-    def list(self, type: str = None, limit: int = 100, 
-            offset: int = 0, scope: str = "project") -> List[Dict[str, Any]]:
-        """列出记忆"""
-        store = self._get_store(scope)
-        
-        if type:
-            return store.list_by_type(type, limit, offset)
+        if tags:
+            return store.search_by_tags(tags, limit)
+        elif type:
+            return store.list_by_type(type, limit)
         else:
-            page_result = store.get_messages_page(
-                page=offset // limit,
-                page_size=limit
-            )
-            return page_result['messages']
+            return store.list_by_type(None, limit)
+    
+    def search(self, query: str, scope: str = "both",
+              tags: List[str] = None, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Search memories
+        
+        Args:
+            query: Search keyword
+            scope: project/global/both
+            tags: Filter by tags
+            limit: Result limit
+        """
+        results = []
+        
+        if scope in ("project", "both"):
+            if self.project_store:
+                if tags:
+                    project_results = self.project_store.search_by_tags(tags, limit)
+                else:
+                    project_results = self.project_store.search(query, limit)
+                for r in project_results:
+                    r["scope"] = "project"
+                results.extend(project_results)
+        
+        if scope in ("global", "both"):
+            if self.global_store:
+                if tags:
+                    global_results = self.global_store.search_by_tags(tags, limit)
+                else:
+                    global_results = self.global_store.search(query, limit)
+                for r in global_results:
+                    r["scope"] = "global"
+                results.extend(global_results)
+        
+        return results
+    
+    def search_by_tags(self, tags: List[str], scope: str = "both", limit: int = 10) -> List[Dict[str, Any]]:
+        """Search by tags"""
+        return self.search("", scope=scope, tags=tags, limit=limit)
     
     def page(self, page: int = 0, page_size: int = 20,
-            memory_type: str = None, scope: str = "project") -> Dict[str, Any]:
-        """分页获取"""
+            scope: str = "project", type: str = None) -> Dict[str, Any]:
+        """Paginate memories"""
         store = self._get_store(scope)
-        return store.get_messages_page(page, page_size, memory_type)
+        return store.get_messages_page(page, page_size, type)
     
-    def count(self, scope: str = "project") -> int:
-        """获取记忆数量"""
-        store = self._get_store(scope)
-        return store.get_memory_count()
+    def get_stats(self, scope: str = "both") -> Dict[str, Any]:
+        """Get statistics"""
+        stats = {"total": 0, "by_type": {}, "by_scope": {}}
+        
+        if scope in ("project", "both"):
+            if self.project_store:
+                project_stats = self.project_store.get_stats()
+                stats["by_scope"]["project"] = project_stats
+                stats["total"] += project_stats["total"]
+                stats["by_type"].update(project_stats.get("by_type", {}))
+        
+        if scope in ("global", "both"):
+            if self.global_store:
+                global_stats = self.global_store.get_stats()
+                stats["by_scope"]["global"] = global_stats
+                stats["total"] += global_stats["total"]
+                stats["by_type"].update(global_stats.get("by_type", {}))
+        
+        return stats
     
     def _get_store(self, scope: str):
-        """获取存储后端"""
+        """Get storage by scope"""
         if scope == "global":
+            if not self.global_store:
+                raise ValueError("Global memory not initialized")
             return self.global_store
-        elif scope == "project":
-            return self.project_store if self.project_store else self.global_store
         else:
-            return self.global_store
+            if not self.project_store:
+                if not self.global_store:
+                    raise ValueError("No memory initialized")
+                return self.global_store
+            return self.project_store
     
     def close(self):
-        """关闭连接"""
+        """Close connections"""
         if self.project_store:
             self.project_store.close()
         if self.global_store:
             self.global_store.close()
-    
-    def __enter__(self):
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
