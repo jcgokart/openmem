@@ -1,9 +1,9 @@
 """
-LLM 客户端 - 支持多种提供商
-- trae: 当前 Trae 对话上下文（默认）
-- ollama: 本地免费模型
-- deepseek: 便宜
-- openai: 标准 API
+LLM Client - Support multiple providers
+- trae: Current Trae context (default)
+- ollama: Local free models
+- deepseek: Cheap API
+- openai: Standard API
 """
 
 import json
@@ -30,13 +30,13 @@ class LLMConfig:
 
 
 class LLMClient:
-    """LLM 客户端"""
+    """LLM Client"""
 
     def __init__(self, config: LLMConfig = None):
         self.config = config or LLMConfig()
 
     def chat(self, prompt: str, system_prompt: str = None) -> str:
-        """调用 LLM"""
+        """Call LLM"""
         provider = self.config.provider
 
         if provider == "trae":
@@ -51,18 +51,18 @@ class LLMClient:
             raise ValueError(f"Unknown provider: {provider}")
 
     def _chat_trae(self, prompt: str, system_prompt: str = None) -> str:
-        """Trae 模式：生成 prompt 让用户复制到 Trae"""
+        """Trae mode: Generate prompt for user to copy to Trae"""
         return f"""
-请帮我整理以下对话的会议纪要：
+Please help me summarize the following conversation:
 
 {prompt}
 
-请按以下 JSON 格式输出：
+Please output in JSON format:
 {{"decisions": [], "todos": [], "records": []}}
 """
 
     def _chat_ollama(self, prompt: str, system_prompt: str = None) -> str:
-        """Ollama 本地模型"""
+        """Ollama local model"""
         base_url = self.config.base_url or "http://localhost:11434"
         model = self.config.model or "qwen2.5:3b"
 
@@ -70,7 +70,7 @@ class LLMClient:
         payload = {
             "model": model,
             "messages": [
-                {"role": "system", "content": system_prompt or "你是一个会议纪要助手。"},
+                {"role": "system", "content": system_prompt or "You are a meeting notes assistant."},
                 {"role": "user", "content": prompt}
             ],
             "stream": False
@@ -94,7 +94,7 @@ class LLMClient:
         payload = {
             "model": self.config.model or "deepseek-chat",
             "messages": [
-                {"role": "system", "content": system_prompt or "你是一个会议纪要助手。"},
+                {"role": "system", "content": system_prompt or "You are a meeting notes assistant."},
                 {"role": "user", "content": prompt}
             ]
         }
@@ -117,7 +117,7 @@ class LLMClient:
         payload = {
             "model": self.config.model or "gpt-4o-mini",
             "messages": [
-                {"role": "system", "content": system_prompt or "你是一个会议纪要助手。"},
+                {"role": "system", "content": system_prompt or "You are a meeting notes assistant."},
                 {"role": "user", "content": prompt}
             ]
         }
@@ -129,7 +129,7 @@ class LLMClient:
 
 
 def get_llm_client(provider: str = None, model: str = None, api_key: str = None) -> LLMClient:
-    """获取 LLM 客户端"""
+    """Get LLM client"""
     config = LLMConfig(
         provider=provider or "trae",
         model=model,
@@ -140,4 +140,4 @@ def get_llm_client(provider: str = None, model: str = None, api_key: str = None)
 
 if __name__ == "__main__":
     client = get_llm_client("trae")
-    print(client.chat("测试对话内容"))
+    print(client.chat("Test conversation content"))

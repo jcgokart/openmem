@@ -1,17 +1,17 @@
 """
-P2-2: 会议纪要整理器
-全量记录 + LLM 提炼 = 会议纪要式记忆
+Meeting Notes Organizer
+Full-record + LLM summarization = Meeting-style memory
 
-核心思路：
-1. 全量记录对话（raw）
-2. LLM 提炼成精炼纪要（summaries）
-3. 保留时间标签，其他简化
+Core concept:
+1. Record all conversations (raw)
+2. LLM summarizes to concise notes (summaries)
+3. Keep timestamps, simplify rest
 
-极简纪要格式：
-## 时间
-### 决策
-### 待办
-### 记录
+Minimal note format:
+## Timestamp
+### Decisions
+### Todos
+### Records
 """
 
 import json
@@ -23,7 +23,7 @@ from dataclasses import dataclass, asdict
 
 @dataclass
 class RawMessage:
-    """原始消息"""
+    """Raw message"""
     timestamp: str
     role: str
     content: str
@@ -32,7 +32,7 @@ class RawMessage:
 
 @dataclass
 class Summary:
-    """会议纪要"""
+    """Meeting summary"""
     date: str
     session_id: str
     decisions: List[str]
@@ -41,36 +41,36 @@ class Summary:
     raw_count: int
 
 
-ORGANIZE_PROMPT = """你是一个会议纪要助手。把以下对话整理成精炼记录。
+ORGANIZE_PROMPT = """You are a meeting notes assistant. Summarize the following conversation.
 
-要求：
-1. 提取关键决策和约定
-2. 提取待办事项（谁负责、何时完成）
-3. 提取重要事实/参数/代码规范
-4. 去掉废话、重复、口语化内容
-5. 保留时间标签
+Requirements:
+1. Extract key decisions and agreements
+2. Extract todos (who, when)
+3. Extract important facts/parameters/code standards
+4. Remove filler words, duplicates, casual content
+5. Keep timestamps
 
-输出格式（JSON）：
+Output format (JSON):
 [JSON]
-{{"decisions": ["决策1", "决策2"], "todos": ["待办1", "待办2"], "records": ["重要记录1", "重要记录2"]}}
+{"decisions": ["decision1", "decision2"], "todos": ["todo1", "todo2"], "records": ["record1", "record2"]}
 [/JSON]
 
-对话内容：
+Conversation:
 {conversation}
 """
 
 
 def format_conversation(messages: List[RawMessage]) -> str:
-    """格式化对话"""
+    """Format conversation"""
     lines = []
     for msg in messages:
-        role = "用户" if msg.role == "user" else "助手"
+        role = "User" if msg.role == "user" else "Assistant"
         lines.append(f"{role}: {msg.content}")
     return "\n\n".join(lines)
 
 
 def parse_summary(response_text: str) -> Summary:
-    """解析 LLM 响应"""
+    """Parse LLM response"""
     try:
         data = json.loads(response_text)
         return Summary(
@@ -93,21 +93,21 @@ def parse_summary(response_text: str) -> Summary:
 
 
 def format_summary_md(summary: Summary) -> str:
-    """格式化为 Markdown"""
+    """Format as Markdown"""
     lines = [f"## {summary.date}"]
 
     if summary.decisions:
-        lines.append("\n### 决策")
+        lines.append("\n### Decisions")
         for item in summary.decisions:
             lines.append(f"- {item}")
 
     if summary.todos:
-        lines.append("\n### 待办")
+        lines.append("\n### Todos")
         for item in summary.todos:
             lines.append(f"- {item}")
 
     if summary.records:
-        lines.append("\n### 记录")
+        lines.append("\n### Records")
         for item in summary.records:
             lines.append(f"- {item}")
 
@@ -115,12 +115,12 @@ def format_summary_md(summary: Summary) -> str:
 
 
 def build_prompt(conversation: str) -> str:
-    """构建 prompt"""
+    """Build prompt"""
     return ORGANIZE_PROMPT.format(conversation=conversation)
 
 
 class Organizer:
-    """会议纪要整理器"""
+    """Meeting notes organizer"""
 
     def __init__(self, memory_dir: str = None):
         if memory_dir is None:
@@ -134,7 +134,7 @@ class Organizer:
         os.makedirs(self.summaries_dir, exist_ok=True)
 
     def add_message(self, role: str, content: str, session_id: str = None) -> str:
-        """添加原始消息"""
+        """Add raw message"""
         if session_id is None:
             session_id = datetime.now().strftime("%Y%m%d%H%M%S")
 
@@ -154,7 +154,7 @@ class Organizer:
         return session_id
 
     def get_raw_messages(self, date: str = None, session_id: str = None) -> List[RawMessage]:
-        """获取原始消息"""
+        """Get raw messages"""
         messages = []
 
         if date is None:
@@ -175,7 +175,7 @@ class Organizer:
         return messages
 
     def get_recent_raw(self, days: int = 1) -> List[RawMessage]:
-        """获取最近 N 天的原始消息"""
+        """Get raw messages from recent N days"""
         messages = []
         for i in range(days):
             date = (datetime.now().replace(hour=0, minute=0, second=0)).date()
@@ -184,7 +184,7 @@ class Organizer:
         return messages
 
     def save_summary(self, summary: Summary) -> str:
-        """保存纪要"""
+        """Save summary"""
         filepath = os.path.join(
             self.summaries_dir,
             f"{summary.date}.md"
@@ -201,17 +201,17 @@ class Organizer:
 if __name__ == "__main__":
     organizer = Organizer()
 
-    organizer.add_message("user", "我们决定用 PostgreSQL 数据库", "test001")
-    organizer.add_message("assistant", "好的，记下来", "test001")
-    organizer.add_message("user", "金额用分不用元", "test001")
+    organizer.add_message("user", "We decided to use PostgreSQL", "test001")
+    organizer.add_message("assistant", "Got it, recorded", "test001")
+    organizer.add_message("user", "Use cents for money, not yuan", "test001")
 
     messages = organizer.get_raw_messages()
-    print(f"共 {len(messages)} 条消息")
+    print(f"Total {len(messages)} messages")
 
     conversation = format_conversation(messages)
-    print("\n对话：")
+    print("\nConversation:")
     print(conversation)
 
     prompt = build_prompt(conversation)
-    print("\nPrompt：")
+    print("\nPrompt:")
     print(prompt[:500])
