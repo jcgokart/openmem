@@ -69,6 +69,13 @@ That's the core problem OpenMem solves.
 
 **Our Vision**: Build a personal knowledge and capability system - a repository of your creativity, not just information.
 
+**Our Journey**: This project isn't just about using AI - it's about **growing with AI**. As AI evolves, so does OpenMem. We:
+- Embrace new technologies (LLM integration, multimodal, agents)
+- Learn from the community (open source contributions)
+- Evolve together with the AI landscape
+
+The goal: Not just consuming AI, but **building with it**.
+
 ---
 
 ## Features
