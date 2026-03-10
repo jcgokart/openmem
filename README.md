@@ -53,31 +53,19 @@ Most AI memory systems focus on **knowledge** - storing documents, files, and in
 > Knowing how to swim won't make you a swimmer.
 > Knowing 1000 recipes won't make you a chef.
 
-**What Really Matters: Your Skills**
+### A Personal Journey
 
-OpenMem is designed for **personal capability building**:
+I witnessed the AI revolution unfold:
 
-- 🎯 **What bugs have you fixed?** (Your debugging expertise)
-- 🛠️ **What patterns do you use?** (Your coding style)  
-- 📚 **What have you learned?** (Your accumulated wisdom)
-- 💡 **What decisions have you made?** (Your technical judgment)
-- ⚔️ **What tools do you master?** (Your十八般兵器 - your toolkit)
+- **2016**: AlphaGo defeated Lee Sedol. For the first time, AI found optimal solutions in an infinite space - it wasn't just brute-force search anymore. It had "intuition."
 
-**The Value Proposition**
+- **The Expert System Era**: We built knowledge bases to store what we already knew. Search, retrieve, repeat. No creation, no growth.
 
-| Other Systems | OpenMem |
-|:---|:---|
-| "What can I look up?" | "What can I do?" |
-| External knowledge base | Your inner capabilities |
-| Information storage | Experience沉淀 |
-| RAG - retrieve and generate | Reflection - learn and grow |
-| "I know everything" | "I can do this" |
+- **The LLM Era**: Now we ask AI everything. But here's the pain: **the more we search, the less we internalize.** Information overload without transformation.
 
-**Your Toolkit Matters More Than Your Database**
+> The more I look up, the less I actually know.
 
-The best developers aren't those who have access to the most information. They're the ones who have **mastered their toolkit** - the patterns, the debugging skills, the decision-making frameworks.
-
-OpenMem helps you build that.
+That's the core problem OpenMem solves.
 
 ---
 
