@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as f:
 setup(
     name="openmem",
     version="0.1.1",
-    author="OpenAlgo",
+    author="jcgokart",
     author_email="",
     description="Memory System for AI-powered Development",
     long_description=long_description,

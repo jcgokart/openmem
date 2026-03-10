@@ -12,7 +12,7 @@ description: |
   - Organize meeting notes automatically
 
 version: 0.1.1
-author: OpenAlgo
+author: jcgokart
 homepage: https://github.com/jcgokart/openmem
 
 commands:
