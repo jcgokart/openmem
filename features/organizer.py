@@ -16,7 +16,7 @@ Minimal note format:
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from dataclasses import dataclass, asdict
 
@@ -178,7 +178,7 @@ class Organizer:
         """Get raw messages from recent N days"""
         messages = []
         for i in range(days):
-            date = (datetime.now().replace(hour=0, minute=0, second=0)).date()
+            date = (datetime.now() - timedelta(days=i)).date()
             date_str = date.strftime("%Y-%m-%d")
             messages.extend(self.get_raw_messages(date_str))
         return messages
