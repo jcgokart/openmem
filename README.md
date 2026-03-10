@@ -67,6 +67,8 @@ I witnessed the AI revolution unfold:
 
 That's the core problem OpenMem solves.
 
+**Our Vision**: Build a personal knowledge and capability system - a repository of your creativity, not just information.
+
 ---
 
 ## Features
