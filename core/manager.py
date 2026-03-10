@@ -7,7 +7,7 @@ import os
 from typing import List, Dict, Any, Optional
 
 from openmem.core.config import MemoryConfig
-from openmem.storage import SQLiteStorage
+from openmem.storage import SQLiteStorage, SQLiteConfig
 
 
 class MemoryManager:
@@ -30,6 +30,16 @@ class MemoryManager:
         global_memory = MemoryManager()
     """
     
+    def _create_storage(self, config: MemoryConfig) -> SQLiteStorage:
+        """Create SQLite storage from MemoryConfig"""
+        storage_config = SQLiteConfig(
+            db_path=config.get_db_path(),
+            enable_fts=config.get_enable_fts(),
+            wal_mode=config.get_wal_mode(),
+            busy_timeout=config.get_busy_timeout()
+        )
+        return SQLiteStorage(storage_config)
+    
     def __init__(self, project_path: str = None, global_first: bool = False):
         """
         Initialize Memory Manager
@@ -43,7 +53,7 @@ class MemoryManager:
         
         if project_path:
             self.project_config = MemoryConfig(project_path=project_path)
-            self.project_store = SQLiteStorage(self.project_config)
+            self.project_store = self._create_storage(self.project_config)
         else:
             self.project_config = None
             self.project_store = None
@@ -51,7 +61,7 @@ class MemoryManager:
         self.global_config = MemoryConfig()
         self.global_store = None
         if os.path.exists(self.global_config.memory_dir):
-            self.global_store = SQLiteStorage(self.global_config)
+            self.global_store = self._create_storage(self.global_config)
     
     def add(self, content: str, type: str = "decision",
            tags: List[str] = None, metadata: dict = None,

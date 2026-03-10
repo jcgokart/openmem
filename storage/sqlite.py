@@ -334,20 +334,29 @@ class SQLiteMemoryBackend(MemoryBackend):
         
         return [self._row_to_dict(row) for row in cursor.fetchall()]
     
-    def list_by_type(self, type: str, limit: int = 100,
+    def list_by_type(self, type: str = None, limit: int = 100,
                     offset: int = 0) -> List[Dict[str, Any]]:
         """List by type"""
         conn = self._get_connection()
         cursor = conn.cursor()
         
-        cursor.execute("""
-            SELECT id, type, content, metadata, tags, priority, 
-                   created_at, updated_at, expires_at, version
-            FROM memories
-            WHERE type = ?
-            ORDER BY created_at DESC
-            LIMIT ? OFFSET ?
-        """, (type, limit, offset))
+        if type is None:
+            cursor.execute("""
+                SELECT id, type, content, metadata, tags, priority, 
+                       created_at, updated_at, expires_at, version
+                FROM memories
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+            """, (limit, offset))
+        else:
+            cursor.execute("""
+                SELECT id, type, content, metadata, tags, priority, 
+                       created_at, updated_at, expires_at, version
+                FROM memories
+                WHERE type = ?
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+            """, (type, limit, offset))
         
         return [self._row_to_dict(row) for row in cursor.fetchall()]
     

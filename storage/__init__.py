@@ -2,6 +2,8 @@
 Memory Storage Module
 """
 
-from openmem.storage_sqlite import SQLiteStorage
+from openmem.storage.sqlite import SQLiteMemoryBackend, SQLiteConfig
 
-__all__ = ["SQLiteStorage"]
+SQLiteStorage = SQLiteMemoryBackend
+
+__all__ = ["SQLiteMemoryBackend", "SQLiteStorage", "SQLiteConfig"]
