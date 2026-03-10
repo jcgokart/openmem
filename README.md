@@ -172,6 +172,73 @@ memory.close()
 - [Contributing](CONTRIBUTING.md)
 - [Changelog](CHANGELOG.md)
 
+---
+
+## 中文简介
+
+**OpenMem** - 面向 AI 开发的个人记忆系统
+
+### 核心理念
+
+我们相信：**知识不是能力**。
+
+现有的 AI 记忆系统都在追求"大而全"——把天下知识都存进来。但真正有价值的是**你身上的本事**：
+- 你踩过哪些坑？
+- 你精通哪些工具？
+- 你做过哪些决策？
+
+这才是你的**十八般兵器**。
+
+### 我们的目标
+
+不是做一个"什么都能查"的知识库，而是帮助你建立**真正的个人能力系统**。
+
+### 主要特性
+
+- 🎯 项目级记忆（独立空间）
+- 🔍 中英文全文搜索（jieba + FTS5 + BM25）
+- 🌐 全局/项目双层结构
+- 📦 模板初始化
+- ⚙️ 配置继承
+- 📝 IDE 规则自动生成
+- 🔒 加密备份
+- ⏮️ 版本控制
+- 🖥️ 支持 Trae IDE + VS Code
+- ⚡ 零依赖（仅 SQLite）
+
+### 安装
+
+```bash
+pip install openmem
+```
+
+### 快速开始
+
+```bash
+# 初始化
+openmem init
+
+# 添加记忆
+openmem add "使用 JWT 做认证" --type decision
+
+# 搜索
+openmem search JWT
+```
+
+### 作为 Python 库使用
+
+```python
+from openmem import MemoryManager
+
+memory = MemoryManager()
+memory.add("重要决策", type="decision")
+results = memory.search("JWT")
+```
+
+**让我们一起成长，与 AI 共进化！**
+
+---
+
 ## License
 
 MIT
