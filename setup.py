@@ -11,7 +11,7 @@ setup(
     description="Memory System for AI-powered Development",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/jcgokart/openmem",
+    url="https://github.com/openlyco/openmem",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 4 - Beta",
