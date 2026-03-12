@@ -44,3 +44,9 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+
+# AI/Trae internal files
+.trae/
+
+# Poetry cache
+.poetry-cache/
