@@ -177,74 +177,69 @@ class UnifiedStorage:
             """, (event_type, json.dumps(payload), timestamp, session_id))
             
             event_id = cursor.lastrowid
-            conn.commit()
-        
-        self._update_materialized_view(event_id, event_type, payload, session_id)
-        
-        return event_id
+            
+            self._update_materialized_view(cursor, event_id, event_type, payload, session_id)
+            
+            return event_id
     
-    def _update_materialized_view(self, event_id: int, event_type: str, 
-                                   payload: Dict[str, Any], session_id: str = None):
-        """Update materialized view from event"""
-        with self._pool.connection() as conn:
-            cursor = conn.cursor()
+    def _update_materialized_view(self, cursor: sqlite3.Cursor, event_id: int, 
+                                   event_type: str, payload: Dict[str, Any], 
+                                   session_id: str = None):
+        """Update materialized view from event (uses external cursor for atomicity)"""
+        if event_type == EventType.MEMORY_ADDED:
+            content = payload.get("content", "")
+            content_tokenized = " ".join(self._tokenize(content))
             
-            if event_type == EventType.MEMORY_ADDED:
-                content = payload.get("content", "")
-                content_tokenized = " ".join(self._tokenize(content))
-                
-                cursor.execute("""
-                    INSERT INTO memories (type, content, content_tokenized, metadata, 
-                                          tags, priority, session_id, source_event_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    payload.get("type", "knowledge"),
-                    content,
-                    content_tokenized,
-                    json.dumps(payload.get("metadata", {})),
-                    json.dumps(payload.get("tags", [])),
-                    payload.get("priority", 0),
-                    session_id,
-                    event_id
-                ))
-                
-            elif event_type == EventType.MEMORY_DELETED:
-                memory_id = payload.get("memory_id")
-                if memory_id:
-                    cursor.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
-                    
-            elif event_type == EventType.MEMORY_UPDATED:
-                memory_id = payload.get("memory_id")
-                if memory_id:
-                    updates = []
-                    values = []
-                    
-                    if "content" in payload:
-                        content = payload["content"]
-                        updates.append("content = ?")
-                        values.append(content)
-                        updates.append("content_tokenized = ?")
-                        values.append(" ".join(self._tokenize(content)))
-                        
-                    if "metadata" in payload:
-                        updates.append("metadata = ?")
-                        values.append(json.dumps(payload["metadata"]))
-                        
-                    if "tags" in payload:
-                        updates.append("tags = ?")
-                        values.append(json.dumps(payload["tags"]))
-                    
-                    if updates:
-                        updates.append("updated_at = ?")
-                        values.append(datetime.now().isoformat())
-                        values.append(memory_id)
-                        
-                        cursor.execute(
-                            f"UPDATE memories SET {', '.join(updates)} WHERE id = ?",
-                            values
-                        )
+            cursor.execute("""
+                INSERT INTO memories (type, content, content_tokenized, metadata, 
+                                      tags, priority, session_id, source_event_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                payload.get("type", "knowledge"),
+                content,
+                content_tokenized,
+                json.dumps(payload.get("metadata", {})),
+                json.dumps(payload.get("tags", [])),
+                payload.get("priority", 0),
+                session_id,
+                event_id
+            ))
             
-            conn.commit()
+        elif event_type == EventType.MEMORY_DELETED:
+            memory_id = payload.get("memory_id")
+            if memory_id:
+                cursor.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
+                
+        elif event_type == EventType.MEMORY_UPDATED:
+            memory_id = payload.get("memory_id")
+            if memory_id:
+                updates = []
+                values = []
+                
+                if "content" in payload:
+                    content = payload["content"]
+                    updates.append("content = ?")
+                    values.append(content)
+                    updates.append("content_tokenized = ?")
+                    values.append(" ".join(self._tokenize(content)))
+                    
+                if "metadata" in payload:
+                    updates.append("metadata = ?")
+                    values.append(json.dumps(payload["metadata"]))
+                    
+                if "tags" in payload:
+                    updates.append("tags = ?")
+                    values.append(json.dumps(payload["tags"]))
+                
+                if updates:
+                    updates.append("updated_at = ?")
+                    values.append(datetime.now().isoformat())
+                    values.append(memory_id)
+                    
+                    cursor.execute(
+                        f"UPDATE memories SET {', '.join(updates)} WHERE id = ?",
+                        values
+                    )
     
     def _tokenize(self, text: str) -> List[str]:
         """Tokenize text for FTS5"""
@@ -382,38 +377,125 @@ class UnifiedStorage:
     def add_memory(self, content: str, memory_type: str = "knowledge",
                    metadata: Dict = None, tags: List[str] = None,
                    priority: int = 0, session_id: str = None) -> int:
-        """Add a memory"""
-        event_id = self.add_event(EventType.MEMORY_ADDED, {
-            "content": content,
-            "type": memory_type,
-            "metadata": metadata or {},
-            "tags": tags or [],
-            "priority": priority
-        }, session_id)
-        
+        """Add a memory (atomic operation)"""
         with self._pool.connection() as conn:
             cursor = conn.cursor()
             
-            cursor.execute(
-                "SELECT id FROM memories WHERE source_event_id = ?",
-                (event_id,)
-            )
+            try:
+                timestamp = datetime.now().isoformat()
+                
+                cursor.execute("""
+                    INSERT INTO events (type, payload, timestamp, session_id)
+                    VALUES (?, ?, ?, ?)
+                """, (EventType.MEMORY_ADDED.value, json.dumps({
+                    "content": content,
+                    "type": memory_type,
+                    "metadata": metadata or {},
+                    "tags": tags or [],
+                    "priority": priority
+                }), timestamp, session_id))
+                
+                event_id = cursor.lastrowid
+                
+                content_tokenized = " ".join(self._tokenize(content))
+                
+                cursor.execute("""
+                    INSERT INTO memories (type, content, content_tokenized, metadata, 
+                                          tags, priority, session_id, source_event_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    memory_type,
+                    content,
+                    content_tokenized,
+                    json.dumps(metadata or {}),
+                    json.dumps(tags or []),
+                    priority,
+                    session_id,
+                    event_id
+                ))
+                
+                memory_id = cursor.lastrowid
+                
+                return memory_id
+            except Exception as e:
+                raise StorageError(f"Failed to add memory: {e}")
+    
+    def update_memory(self, memory_id: int, **kwargs) -> bool:
+        """Update a memory (atomic operation, returns True/False)"""
+        with self._pool.connection() as conn:
+            cursor = conn.cursor()
             
-            row = cursor.fetchone()
-            return row[0] if row else event_id
+            try:
+                cursor.execute("SELECT id FROM memories WHERE id = ?", (memory_id,))
+                if not cursor.fetchone():
+                    return False
+                
+                timestamp = datetime.now().isoformat()
+                
+                cursor.execute("""
+                    INSERT INTO events (type, payload, timestamp, session_id)
+                    VALUES (?, ?, ?, ?)
+                """, (EventType.MEMORY_UPDATED.value, json.dumps({
+                    "memory_id": memory_id,
+                    **kwargs
+                }), timestamp, None))
+                
+                updates = []
+                values = []
+                
+                if "content" in kwargs:
+                    content = kwargs["content"]
+                    updates.append("content = ?")
+                    values.append(content)
+                    updates.append("content_tokenized = ?")
+                    values.append(" ".join(self._tokenize(content)))
+                    
+                if "metadata" in kwargs:
+                    updates.append("metadata = ?")
+                    values.append(json.dumps(kwargs["metadata"]))
+                    
+                if "tags" in kwargs:
+                    updates.append("tags = ?")
+                    values.append(json.dumps(kwargs["tags"]))
+                
+                if updates:
+                    updates.append("updated_at = ?")
+                    values.append(datetime.now().isoformat())
+                    values.append(memory_id)
+                    
+                    cursor.execute(
+                        f"UPDATE memories SET {', '.join(updates)} WHERE id = ?",
+                        values
+                    )
+                
+                return cursor.rowcount > 0
+            except Exception as e:
+                raise StorageError(f"Failed to update memory: {e}")
     
-    def update_memory(self, memory_id: int, **kwargs):
-        """Update a memory"""
-        self.add_event(EventType.MEMORY_UPDATED, {
-            "memory_id": memory_id,
-            **kwargs
-        })
-    
-    def delete_memory(self, memory_id: int):
-        """Delete a memory"""
-        self.add_event(EventType.MEMORY_DELETED, {
-            "memory_id": memory_id
-        })
+    def delete_memory(self, memory_id: int) -> bool:
+        """Delete a memory (atomic operation, returns True/False)"""
+        with self._pool.connection() as conn:
+            cursor = conn.cursor()
+            
+            try:
+                cursor.execute("SELECT id FROM memories WHERE id = ?", (memory_id,))
+                if not cursor.fetchone():
+                    return False
+                
+                timestamp = datetime.now().isoformat()
+                
+                cursor.execute("""
+                    INSERT INTO events (type, payload, timestamp, session_id)
+                    VALUES (?, ?, ?, ?)
+                """, (EventType.MEMORY_DELETED.value, json.dumps({
+                    "memory_id": memory_id
+                }), timestamp, None))
+                
+                cursor.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
+                
+                return cursor.rowcount > 0
+            except Exception as e:
+                raise StorageError(f"Failed to delete memory: {e}")
     
     def search(self, query: str, limit: int = 10, session_id: str = None) -> List[Dict]:
         """Search memories"""

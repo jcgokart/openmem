@@ -79,7 +79,7 @@ class MemoryManager:
     def update(self, memory_id: int, content: str = None,
               metadata: dict = None, tags: List[str] = None,
               priority: int = None, scope: str = "project") -> bool:
-        """Update memory"""
+        """Update memory (returns True/False based on actual result)"""
         store = self._get_store(scope)
         update_kwargs = {}
         if content is not None:
@@ -92,15 +92,13 @@ class MemoryManager:
             update_kwargs["priority"] = priority
         
         if update_kwargs:
-            store.update_memory(memory_id, **update_kwargs)
-            return True
+            return store.update_memory(memory_id, **update_kwargs)
         return False
     
     def delete(self, memory_id: int, scope: str = "project") -> bool:
-        """Delete memory"""
+        """Delete memory (returns True/False based on actual result)"""
         store = self._get_store(scope)
-        store.delete_memory(memory_id)
-        return True
+        return store.delete_memory(memory_id)
     
     def list(self, type: str = None, scope: str = "project",
             tags: List[str] = None, limit: int = 100) -> List[Dict[str, Any]]:

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "openmem"
-version = "0.1.5"
+version = "0.1.6"
 description = "Memory System for AI-powered Development"
 authors = ["jcgokart"]
 license = "MIT"

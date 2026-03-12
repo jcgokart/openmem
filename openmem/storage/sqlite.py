@@ -88,16 +88,23 @@ class ConnectionPool:
         """
         Context manager for connection handling.
         Ensures connection is always returned to pool, even on exception.
+        Auto-commits on success, auto-rollbacks on exception.
         
         Usage:
             with pool.connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT * FROM memories")
+                cursor.execute("INSERT INTO ...")
+            # Auto-commit here
         """
         conn = None
         try:
             conn = self.get_connection()
             yield conn
+            conn.commit()
+        except Exception:
+            if conn is not None:
+                conn.rollback()
+            raise
         finally:
             if conn is not None:
                 self.return_connection(conn)
