@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as f:
 
 setup(
     name="openmem",
-    version="0.1.3",
+    version="0.1.4",
     author="jcgokart",
     author_email="",
     description="Memory System for AI-powered Development",
@@ -35,7 +35,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "omem=openmem.cli.main:main",
+            "omem=cli.main:main",
         ],
     },
     package_data={

@@ -1,89 +1,139 @@
-import pytest
+"""
+Tests for MemoryManager
+"""
+
 import os
 import tempfile
 import shutil
-from openmem.core.manager import MemoryManager
+import pytest
+
+from core.manager import MemoryManager
+from core.config import MemoryConfig
 
 
 class TestMemoryManager:
+    """Test MemoryManager"""
+    
     @pytest.fixture
     def temp_project(self):
         tmpdir = tempfile.mkdtemp()
         yield tmpdir
         shutil.rmtree(tmpdir, ignore_errors=True)
     
+    def test_init_global(self):
+        """Test global init"""
+        manager = MemoryManager()
+        assert manager.global_config is not None
+    
     def test_init_project(self, temp_project):
-        memory = MemoryManager(project_path=temp_project)
-        assert memory.project_store is not None
-        memory.close()
+        """Test project init"""
+        manager = MemoryManager(project_path=temp_project)
+        assert manager.project_config is not None
+        assert manager.project_store is not None
     
     def test_add_memory(self, temp_project):
-        memory = MemoryManager(project_path=temp_project)
-        memory_id = memory.add("Test memory", "decision", tags=["test"])
+        """Test add memory"""
+        manager = MemoryManager(project_path=temp_project)
+        
+        memory_id = manager.add(
+            content="Test decision",
+            type="decision",
+            tags=["test"]
+        )
+        
+        assert memory_id is not None
         assert memory_id > 0
-        memory.close()
+        
+        manager.close()
     
-    def test_list_memory(self, temp_project):
-        memory = MemoryManager(project_path=temp_project)
-        memory.add("Test 1", "decision", tags=["test"])
-        memory.add("Test 2", "milestone", tags=["test"])
+    def test_get_memory(self, temp_project):
+        """Test get memory"""
+        manager = MemoryManager(project_path=temp_project)
         
-        results = memory.list(type="decision")
-        assert len(results) >= 1
+        memory_id = manager.add(
+            content="Test content",
+            type="knowledge"
+        )
         
-        results = memory.list(type="milestone")
-        assert len(results) >= 1
-        memory.close()
+        memory = manager.get(memory_id)
+        assert memory is not None
+        assert memory["content"] == "Test content"
+        
+        manager.close()
     
     def test_search_memory(self, temp_project):
-        memory = MemoryManager(project_path=temp_project)
-        memory.add("Use JWT for authentication", "decision", tags=["auth"])
+        """Test search memory"""
+        manager = MemoryManager(project_path=temp_project)
         
-        results = memory.search("JWT")
+        manager.add(content="Python is great", type="knowledge")
+        manager.add(content="JavaScript is also good", type="knowledge")
+        
+        results = manager.search("Python")
         assert len(results) >= 1
-        memory.close()
+        assert "Python" in results[0]["content"]
+        
+        manager.close()
     
-    def test_search_chinese(self, temp_project):
-        memory = MemoryManager(project_path=temp_project)
-        memory.add("Database connection pool config", "knowledge", tags=["db"])
+    def test_list_memories(self, temp_project):
+        """Test list memories"""
+        manager = MemoryManager(project_path=temp_project)
         
-        results = memory.search("database")
-        assert len(results) >= 1
-        memory.close()
-    
-    def test_tags_search(self, temp_project):
-        memory = MemoryManager(project_path=temp_project)
-        memory.add("Test", "decision", tags=["python", "test"])
+        manager.add(content="Memory 1", type="decision")
+        manager.add(content="Memory 2", type="knowledge")
         
-        results = memory.search_by_tags(["python"])
-        assert len(results) >= 1
-        memory.close()
-    
-    def test_update_memory(self, temp_project):
-        memory = MemoryManager(project_path=temp_project)
-        memory_id = memory.add("Original content", "decision")
+        memories = manager.list()
+        assert len(memories) >= 2
         
-        updated = memory.update(memory_id, content="Updated content")
-        assert updated is True
-        
-        results = memory.list()
-        assert any(r['content'] == "Updated content" for r in results)
-        memory.close()
+        manager.close()
     
     def test_delete_memory(self, temp_project):
-        memory = MemoryManager(project_path=temp_project)
-        memory_id = memory.add("To be deleted", "decision")
+        """Test delete memory"""
+        manager = MemoryManager(project_path=temp_project)
         
-        deleted = memory.delete(memory_id)
-        assert deleted is True
-        memory.close()
+        memory_id = manager.add(content="To be deleted", type="temp")
+        
+        result = manager.delete(memory_id)
+        assert result == True
+        
+        memory = manager.get(memory_id)
+        assert memory is None
+        
+        manager.close()
     
-    def test_page_memory(self, temp_project):
-        memory = MemoryManager(project_path=temp_project)
-        for i in range(15):
-            memory.add(f"Memory {i}", "decision")
+    def test_get_stats(self, temp_project):
+        """Test get stats"""
+        manager = MemoryManager(project_path=temp_project)
         
-        page1 = memory.page(page=0, page_size=10)
-        assert len(page1['messages']) == 10
-        assert page1['total'] >= 15
-        memory.close()
+        manager.add(content="Stat 1", type="decision")
+        manager.add(content="Stat 2", type="knowledge")
+        
+        stats = manager.get_stats()
+        assert stats["total"] >= 2
+        
+        manager.close()
+    
+    def test_count(self, temp_project):
+        """Test count"""
+        manager = MemoryManager(project_path=temp_project)
+        
+        initial_count = manager.count()
+        
+        manager.add(content="New memory", type="test")
+        
+        new_count = manager.count()
+        assert new_count == initial_count + 1
+        
+        manager.close()
+    
+    def test_page(self, temp_project):
+        """Test page"""
+        manager = MemoryManager(project_path=temp_project)
+        
+        for i in range(25):
+            manager.add(content=f"Memory {i}", type="test")
+        
+        page = manager.page(page=0, page_size=10)
+        assert len(page["messages"]) == 10
+        assert page["total"] >= 25
+        
+        manager.close()

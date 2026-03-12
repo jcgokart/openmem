@@ -9,8 +9,8 @@ import argparse
 import yaml
 from datetime import datetime
 
-from openmem import MemoryManager
-from openmem.features.trigger import SmartTrigger
+from core.manager import MemoryManager
+from features.trigger import SmartTrigger
 
 
 def cmd_init(args):
@@ -293,7 +293,7 @@ def cmd_add(args):
 
 def cmd_record(args):
     """Record conversation to raw"""
-    from openmem.features.organizer import Organizer
+    from features.organizer import Organizer
 
     organizer = Organizer()
     session_id = organizer.add_message(role=args.role, content=args.content)
@@ -375,8 +375,8 @@ def cmd_page(args):
 
 def cmd_organize(args):
     """Organize meeting minutes"""
-    from openmem.features.organizer import Organizer, format_conversation, build_prompt, format_summary_md, parse_summary
-    from openmem.features.llm import get_llm_client
+    from features.organizer import Organizer, format_conversation, build_prompt, format_summary_md, parse_summary
+    from features.llm import get_llm_client
 
     organizer = Organizer()
 
@@ -424,7 +424,7 @@ def cmd_organize(args):
 
 def cmd_raw(args):
     """View raw records"""
-    from openmem.features.organizer import Organizer
+    from features.organizer import Organizer
 
     organizer = Organizer()
     date = args.date if args.date else datetime.now().strftime("%Y-%m-%d")
@@ -443,7 +443,7 @@ def cmd_raw(args):
 
 def cmd_summary(args):
     """View summaries"""
-    from openmem.features.organizer import Organizer
+    from features.organizer import Organizer
 
     organizer = Organizer()
     date = args.date if args.date else datetime.now().strftime("%Y-%m-%d")

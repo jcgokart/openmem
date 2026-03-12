@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 import jieba
 
-from openmem.data.vocabularies import STOPWORDS, TECH_WORDS
+from data.vocabularies import STOPWORDS, TECH_WORDS
 
 
 class ChineseTokenizer:

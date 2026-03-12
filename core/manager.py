@@ -4,10 +4,11 @@ Supports Global/Project layers, flexible like Poetry
 """
 
 import os
+import warnings
 from typing import List, Dict, Any, Optional
 
-from openmem.core.config import MemoryConfig
-from openmem.storage import SQLiteStorage, SQLiteConfig
+from core.config import MemoryConfig
+from storage import UnifiedStorage
 
 
 class MemoryManager:
@@ -30,16 +31,6 @@ class MemoryManager:
         global_memory = MemoryManager()
     """
     
-    def _create_storage(self, config: MemoryConfig) -> SQLiteStorage:
-        """Create SQLite storage from MemoryConfig"""
-        storage_config = SQLiteConfig(
-            db_path=config.get_db_path(),
-            enable_fts=config.get_enable_fts(),
-            wal_mode=config.get_wal_mode(),
-            busy_timeout=config.get_busy_timeout()
-        )
-        return SQLiteStorage(storage_config)
-    
     def __init__(self, project_path: str = None, global_first: bool = False):
         """
         Initialize Memory Manager
@@ -53,7 +44,9 @@ class MemoryManager:
         
         if project_path:
             self.project_config = MemoryConfig(project_path=project_path)
-            self.project_store = self._create_storage(self.project_config)
+            self.project_store = UnifiedStorage(
+                db_path=self.project_config.get_db_path()
+            )
         else:
             self.project_config = None
             self.project_store = None
@@ -61,42 +54,64 @@ class MemoryManager:
         self.global_config = MemoryConfig()
         self.global_store = None
         if os.path.exists(self.global_config.memory_dir):
-            self.global_store = self._create_storage(self.global_config)
+            self.global_store = UnifiedStorage(
+                db_path=self.global_config.get_db_path()
+            )
     
     def add(self, content: str, type: str = "decision",
            tags: List[str] = None, metadata: dict = None,
            priority: int = 0, scope: str = "project") -> int:
         """Add memory"""
         store = self._get_store(scope)
-        return store.create(type, content, metadata, tags, priority)
+        return store.add_memory(
+            content=content,
+            memory_type=type,
+            metadata=metadata,
+            tags=tags,
+            priority=priority
+        )
     
     def get(self, memory_id: int, scope: str = "project") -> Optional[Dict[str, Any]]:
         """Get memory"""
         store = self._get_store(scope)
-        return store.read(memory_id)
+        return store.get_memory(memory_id)
     
     def update(self, memory_id: int, content: str = None,
               metadata: dict = None, tags: List[str] = None,
               priority: int = None, scope: str = "project") -> bool:
         """Update memory"""
         store = self._get_store(scope)
-        return store.update(memory_id, content, metadata, tags, priority)
+        update_kwargs = {}
+        if content is not None:
+            update_kwargs["content"] = content
+        if metadata is not None:
+            update_kwargs["metadata"] = metadata
+        if tags is not None:
+            update_kwargs["tags"] = tags
+        if priority is not None:
+            update_kwargs["priority"] = priority
+        
+        if update_kwargs:
+            store.update_memory(memory_id, **update_kwargs)
+            return True
+        return False
     
     def delete(self, memory_id: int, scope: str = "project") -> bool:
         """Delete memory"""
         store = self._get_store(scope)
-        return store.delete(memory_id)
+        store.delete_memory(memory_id)
+        return True
     
     def list(self, type: str = None, scope: str = "project",
             tags: List[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
         """List memories"""
         store = self._get_store(scope)
+        memories = store.list_memories(memory_type=type, limit=limit)
+        
         if tags:
-            return store.search_by_tags(tags, limit)
-        elif type:
-            return store.list_by_type(type, limit)
-        else:
-            return store.list_by_type(None, limit)
+            memories = [m for m in memories if any(tag in m.get("tags", []) for tag in tags)]
+        
+        return memories
     
     def search(self, query: str, scope: str = "both",
               tags: List[str] = None, limit: int = 10) -> List[Dict[str, Any]]:
@@ -113,25 +128,22 @@ class MemoryManager:
         
         if scope in ("project", "both"):
             if self.project_store:
-                if tags:
-                    project_results = self.project_store.search_by_tags(tags, limit)
-                else:
-                    project_results = self.project_store.search(query, limit)
+                project_results = self.project_store.search(query, limit)
                 for r in project_results:
                     r["scope"] = "project"
                 results.extend(project_results)
         
         if scope in ("global", "both"):
             if self.global_store:
-                if tags:
-                    global_results = self.global_store.search_by_tags(tags, limit)
-                else:
-                    global_results = self.global_store.search(query, limit)
+                global_results = self.global_store.search(query, limit)
                 for r in global_results:
                     r["scope"] = "global"
                 results.extend(global_results)
         
-        return results
+        if tags:
+            results = [r for r in results if any(tag in r.get("tags", []) for tag in tags)]
+        
+        return results[:limit]
     
     def search_by_tags(self, tags: List[str], scope: str = "both", limit: int = 10) -> List[Dict[str, Any]]:
         """Search by tags"""
@@ -141,7 +153,21 @@ class MemoryManager:
             scope: str = "project", type: str = None) -> Dict[str, Any]:
         """Paginate memories"""
         store = self._get_store(scope)
-        return store.get_messages_page(page, page_size, type)
+        offset = page * page_size
+        memories = store.list_memories(
+            memory_type=type, 
+            limit=page_size, 
+            offset=offset
+        )
+        total = store.get_memory_count()
+        
+        return {
+            "messages": memories,
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+            "total_pages": (total + page_size - 1) // page_size if total > 0 else 0
+        }
     
     def get_stats(self, scope: str = "both") -> Dict[str, Any]:
         """Get statistics"""
@@ -168,13 +194,13 @@ class MemoryManager:
         total = 0
         if scope in ("project", "both"):
             if self.project_store:
-                total += self.project_store.get_stats()["total"]
+                total += self.project_store.get_memory_count()
         if scope in ("global", "both"):
             if self.global_store:
-                total += self.global_store.get_stats()["total"]
+                total += self.global_store.get_memory_count()
         return total
     
-    def _get_store(self, scope: str):
+    def _get_store(self, scope: str) -> UnifiedStorage:
         """Get storage by scope"""
         if scope == "global":
             if not self.global_store:
