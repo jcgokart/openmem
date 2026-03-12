@@ -8,7 +8,9 @@ from openmem.storage.exceptions import (
     StorageError, 
     FTSSearchError, 
     ConnectionPoolError,
-    MemoryNotFoundError
+    MemoryNotFoundError,
+    DatabaseIntegrityError,
+    DatabaseOperationalError
 )
 
 SQLiteStorage = SQLiteMemoryBackend
@@ -25,5 +27,7 @@ __all__ = [
     "StorageError",
     "FTSSearchError",
     "ConnectionPoolError",
-    "MemoryNotFoundError"
+    "MemoryNotFoundError",
+    "DatabaseIntegrityError",
+    "DatabaseOperationalError"
 ]

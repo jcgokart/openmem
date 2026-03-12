@@ -8,6 +8,7 @@ import json
 import os
 import uuid
 import secrets
+import logging
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Generator
 from contextlib import contextmanager
@@ -15,7 +16,12 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 
 from .sqlite import ConnectionPool
-from .exceptions import StorageError, FTSSearchError
+from .exceptions import (
+    StorageError, FTSSearchError, MemoryNotFoundError,
+    DatabaseIntegrityError, DatabaseOperationalError
+)
+
+logger = logging.getLogger("openmem")
 
 
 class EventType(str, Enum):
@@ -260,6 +266,23 @@ class UnifiedStorage:
         tokens = list(jieba.cut(text))
         return [t.strip().lower() for t in tokens if t.strip()]
     
+    def _escape_content(self, content: str) -> str:
+        """
+        Escape content to prevent SQL injection.
+        SQLite parameter binding handles this, but we add extra validation.
+        
+        Args:
+            content: Raw content string
+            
+        Returns:
+            str: Validated content (unchanged, as parameter binding handles escaping)
+        """
+        if content is None:
+            return ""
+        if not isinstance(content, str):
+            content = str(content)
+        return content
+    
     def get_events(self, session_id: str = None, event_type: str = None,
                    limit: int = 100) -> List[Event]:
         """Get events"""
@@ -453,17 +476,20 @@ class UnifiedStorage:
                 
             except sqlite3.IntegrityError as e:
                 cursor.execute("ROLLBACK")
-                raise StorageError(f"Data integrity error adding memory: {e}") from e
+                logger.error(f"Data integrity error adding memory: {e}", exc_info=True)
+                raise DatabaseIntegrityError(f"Data integrity error: {e}", e) from e
             except sqlite3.OperationalError as e:
                 cursor.execute("ROLLBACK")
-                raise StorageError(f"Database operational error: {e}") from e
+                logger.error(f"Database operational error: {e}", exc_info=True)
+                raise DatabaseOperationalError(f"Database operational error: {e}", e) from e
             except Exception as e:
                 cursor.execute("ROLLBACK")
+                logger.exception(f"Unexpected error adding memory")
                 raise StorageError(f"Unexpected error adding memory: {e}") from e
     
     def update_memory(self, memory_id: int, **kwargs) -> bool:
         """
-        Update a memory with atomic transaction and proper error handling.
+        Update a memory with atomic transaction using fixed SQL (no dynamic拼接).
         
         Args:
             memory_id: The ID of memory to update
@@ -488,14 +514,22 @@ class UnifiedStorage:
                 cursor.execute("BEGIN IMMEDIATE")
                 
                 cursor.execute(
-                    "SELECT 1 FROM memories WHERE id = ?",
+                    "SELECT content, metadata, tags, priority FROM memories WHERE id = ?",
                     (memory_id,)
                 )
-                if not cursor.fetchone():
+                row = cursor.fetchone()
+                if not row:
                     cursor.execute("ROLLBACK")
                     return False
                 
+                current_content, current_metadata, current_tags, current_priority = row
+                
                 timestamp = datetime.now().isoformat()
+                
+                new_content = updates.get('content', current_content)
+                new_metadata = updates.get('metadata', json.loads(current_metadata) if current_metadata else {})
+                new_tags = updates.get('tags', json.loads(current_tags) if current_tags else [])
+                new_priority = updates.get('priority', current_priority if current_priority else 0)
                 
                 cursor.execute("""
                     INSERT INTO events (type, payload, timestamp, session_id)
@@ -505,38 +539,26 @@ class UnifiedStorage:
                     "updates": {k: v for k, v in updates.items() if k != 'content'}
                 }), timestamp, None))
                 
-                set_clauses = []
-                params = []
+                content_tokenized = ' '.join(self._tokenize(new_content))
                 
-                if 'content' in updates:
-                    content = updates['content']
-                    set_clauses.extend(['content = ?', 'content_tokenized = ?'])
-                    params.extend([content, ' '.join(self._tokenize(content))])
-                
-                if 'metadata' in updates:
-                    set_clauses.append('metadata = ?')
-                    params.append(json.dumps(updates['metadata']))
-                
-                if 'tags' in updates:
-                    set_clauses.append('tags = ?')
-                    params.append(json.dumps(updates['tags']))
-                
-                if 'priority' in updates:
-                    set_clauses.append('priority = ?')
-                    params.append(updates['priority'])
-                
-                set_clauses.append('updated_at = ?')
-                params.append(timestamp)
-                
-                for clause in set_clauses:
-                    if clause not in self.VALID_CLAUSES:
-                        raise ValueError(f"Invalid SQL clause generated: {clause}")
-                
-                params.append(memory_id)
-                
-                set_sql = ', '.join(set_clauses)
-                sql = f"UPDATE memories SET {set_sql} WHERE id = ?"
-                cursor.execute(sql, params)
+                cursor.execute("""
+                    UPDATE memories 
+                    SET content = ?, 
+                        content_tokenized = ?, 
+                        metadata = ?, 
+                        tags = ?, 
+                        priority = ?, 
+                        updated_at = ?
+                    WHERE id = ?
+                """, (
+                    new_content,
+                    content_tokenized,
+                    json.dumps(new_metadata),
+                    json.dumps(new_tags),
+                    new_priority,
+                    timestamp,
+                    memory_id
+                ))
                 
                 rows_affected = cursor.rowcount
                 
@@ -546,15 +568,18 @@ class UnifiedStorage:
                 
             except sqlite3.IntegrityError as e:
                 cursor.execute("ROLLBACK")
-                raise StorageError(f"Data integrity error updating memory {memory_id}: {e}") from e
+                logger.error(f"Data integrity error updating memory {memory_id}: {e}", exc_info=True)
+                raise DatabaseIntegrityError(f"Data integrity error: {e}", e) from e
             except sqlite3.OperationalError as e:
                 cursor.execute("ROLLBACK")
-                raise StorageError(f"Database operational error: {e}") from e
+                logger.error(f"Database operational error: {e}", exc_info=True)
+                raise DatabaseOperationalError(f"Database operational error: {e}", e) from e
             except ValueError:
                 cursor.execute("ROLLBACK")
                 raise
             except Exception as e:
                 cursor.execute("ROLLBACK")
+                logger.exception(f"Unexpected error updating memory {memory_id}")
                 raise StorageError(f"Unexpected error updating memory: {e}") from e
     
     def delete_memory(self, memory_id: int) -> bool:
@@ -603,12 +628,15 @@ class UnifiedStorage:
                 
             except sqlite3.IntegrityError as e:
                 cursor.execute("ROLLBACK")
-                raise StorageError(f"Data integrity error deleting memory {memory_id}: {e}") from e
+                logger.error(f"Data integrity error deleting memory {memory_id}: {e}", exc_info=True)
+                raise DatabaseIntegrityError(f"Data integrity error: {e}", e) from e
             except sqlite3.OperationalError as e:
                 cursor.execute("ROLLBACK")
-                raise StorageError(f"Database operational error: {e}") from e
+                logger.error(f"Database operational error: {e}", exc_info=True)
+                raise DatabaseOperationalError(f"Database operational error: {e}", e) from e
             except Exception as e:
                 cursor.execute("ROLLBACK")
+                logger.exception(f"Unexpected error deleting memory {memory_id}")
                 raise StorageError(f"Unexpected error deleting memory: {e}") from e
     
     def search(self, query: str, limit: int = 10, session_id: str = None) -> List[Dict]:
