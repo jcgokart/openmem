@@ -1,10 +1,11 @@
 [tool.poetry]
 name = "openmem"
-version = "0.1.4"
+version = "0.1.5"
 description = "Memory System for AI-powered Development"
 authors = ["jcgokart"]
 license = "MIT"
 readme = "README.md"
+packages = [{include = "openmem"}]
 
 [tool.poetry.dependencies]
 python = "^3.8"
@@ -25,4 +26,4 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["openmem/tests"]

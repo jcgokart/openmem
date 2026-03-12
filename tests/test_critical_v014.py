@@ -12,7 +12,7 @@ import threading
 import time
 import queue
 
-from storage import UnifiedStorage, ConnectionPool, FTSSearchError, StorageError
+from openmem.storage import UnifiedStorage, ConnectionPool, FTSSearchError, StorageError
 
 
 class TestConnectionLeak:
@@ -48,6 +48,7 @@ class TestConnectionLeak:
     def test_exception_does_not_leak_connection(self, temp_db):
         """测试异常情况下连接仍然归还"""
         pool = ConnectionPool(db_path=temp_db, pool_size=2)
+        pool.initialize()
         
         pool_size_before = pool._pool.qsize()
         
@@ -202,18 +203,18 @@ class TestThreadSafety:
         pool = ConnectionPool(db_path=temp_db, pool_size=5)
         
         init_count = [0]
-        original_init = pool.initialize
+        original_do_init = pool._do_initialize
         
         def counted_init():
             init_count[0] += 1
-            return original_init()
+            return original_do_init()
         
-        pool.initialize = counted_init
+        pool._do_initialize = counted_init
         
         pool.get_connection()
         pool.return_connection(pool.get_connection())
         pool.get_connection()
         
-        assert init_count[0] == 1, f"initialize() called {init_count[0]} times, expected 1"
+        assert init_count[0] == 1, f"_do_initialize() called {init_count[0]} times, expected 1"
         
         pool.close_all()

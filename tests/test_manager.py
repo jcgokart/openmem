@@ -7,8 +7,8 @@ import tempfile
 import shutil
 import pytest
 
-from core.manager import MemoryManager
-from core.config import MemoryConfig
+from openmem.core.manager import MemoryManager
+from openmem.core.config import MemoryConfig
 
 
 class TestMemoryManager:

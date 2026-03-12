@@ -9,7 +9,7 @@ from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass
 from enum import Enum
 
-from data.vocabularies import TRIGGER_KEYWORDS, NEGATIONS, INTENSIFIERS, TECH_WORDS
+from openmem.data.vocabularies import TRIGGER_KEYWORDS, NEGATIONS, INTENSIFIERS, TECH_WORDS
 
 
 class TriggerType(Enum):

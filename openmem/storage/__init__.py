@@ -2,9 +2,9 @@
 Memory Storage Module
 """
 
-from storage.sqlite import SQLiteMemoryBackend, SQLiteConfig, ConnectionPool
-from storage.unified import UnifiedStorage, Event, Session, EventType
-from storage.exceptions import (
+from openmem.storage.sqlite import SQLiteMemoryBackend, SQLiteConfig, ConnectionPool
+from openmem.storage.unified import UnifiedStorage, Event, Session, EventType
+from openmem.storage.exceptions import (
     StorageError, 
     FTSSearchError, 
     ConnectionPoolError,

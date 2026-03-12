@@ -7,8 +7,8 @@ import os
 import warnings
 from typing import List, Dict, Any, Optional
 
-from core.config import MemoryConfig
-from storage import UnifiedStorage
+from openmem.core.config import MemoryConfig
+from openmem.storage import UnifiedStorage
 
 
 class MemoryManager:
