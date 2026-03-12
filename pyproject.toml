@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "openmem"
-version = "0.1.7.1"
+version = "0.1.8"
 description = "Memory System for AI-powered Development"
 authors = ["jcgokart"]
 license = "MIT"
@@ -14,9 +14,12 @@ jieba = ">=0.42"
 cryptography = ">=3.0"
 requests = ">=2.28"
 sqlite-vec = ">=0.1.0"
+sqlalchemy = ">=2.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=7.0"
+bandit = ">=1.7"
+mypy = ">=1.0"
 
 [tool.poetry.scripts]
 omem = "cli.main:main"
