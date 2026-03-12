@@ -2,7 +2,7 @@
 OpenMem - Memory System for AI-powered Development
 """
 
-__version__ = "0.1.6"
+__version__ = "0.1.7"
 
 from openmem.core.manager import MemoryManager
 from openmem.core.config import MemoryConfig

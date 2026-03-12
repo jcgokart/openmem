@@ -73,6 +73,13 @@ class UnifiedStorage:
     - Context manager for connection handling (no leaks)
     """
     
+    ALLOWED_FIELDS = frozenset({'content', 'metadata', 'tags', 'priority'})
+    
+    VALID_CLAUSES = frozenset({
+        'content = ?', 'content_tokenized = ?',
+        'metadata = ?', 'tags = ?', 'priority = ?', 'updated_at = ?'
+    })
+    
     def __init__(self, db_path: str, pool_size: int = 5):
         self.db_path = db_path
         self._pool = ConnectionPool(
@@ -185,7 +192,13 @@ class UnifiedStorage:
     def _update_materialized_view(self, cursor: sqlite3.Cursor, event_id: int, 
                                    event_type: str, payload: Dict[str, Any], 
                                    session_id: str = None):
-        """Update materialized view from event (uses external cursor for atomicity)"""
+        """
+        Update materialized view from event.
+        
+        WARNING: This method MUST be called within an existing cursor context.
+        DO NOT create a new connection inside this method.
+        Violating this will break transaction atomicity!
+        """
         if event_type == EventType.MEMORY_ADDED:
             content = payload.get("content", "")
             content_tokenized = " ".join(self._tokenize(content))
@@ -377,11 +390,29 @@ class UnifiedStorage:
     def add_memory(self, content: str, memory_type: str = "knowledge",
                    metadata: Dict = None, tags: List[str] = None,
                    priority: int = 0, session_id: str = None) -> int:
-        """Add a memory (atomic operation)"""
+        """
+        Add a memory with atomic transaction.
+        
+        Args:
+            content: Memory content
+            memory_type: Type of memory (default: "knowledge")
+            metadata: Optional metadata dict
+            tags: Optional list of tags
+            priority: Priority level (default: 0)
+            session_id: Optional session ID
+            
+        Returns:
+            int: The ID of the created memory
+            
+        Raises:
+            StorageError: If database operation fails
+        """
         with self._pool.connection() as conn:
             cursor = conn.cursor()
             
             try:
+                cursor.execute("BEGIN IMMEDIATE")
+                
                 timestamp = datetime.now().isoformat()
                 
                 cursor.execute("""
@@ -416,18 +447,52 @@ class UnifiedStorage:
                 
                 memory_id = cursor.lastrowid
                 
+                cursor.execute("COMMIT")
+                
                 return memory_id
+                
+            except sqlite3.IntegrityError as e:
+                cursor.execute("ROLLBACK")
+                raise StorageError(f"Data integrity error adding memory: {e}") from e
+            except sqlite3.OperationalError as e:
+                cursor.execute("ROLLBACK")
+                raise StorageError(f"Database operational error: {e}") from e
             except Exception as e:
-                raise StorageError(f"Failed to add memory: {e}")
+                cursor.execute("ROLLBACK")
+                raise StorageError(f"Unexpected error adding memory: {e}") from e
     
     def update_memory(self, memory_id: int, **kwargs) -> bool:
-        """Update a memory (atomic operation, returns True/False)"""
+        """
+        Update a memory with atomic transaction and proper error handling.
+        
+        Args:
+            memory_id: The ID of memory to update
+            **kwargs: Fields to update (content, metadata, tags, priority)
+            
+        Returns:
+            bool: True if actually updated, False if memory_id not found
+            
+        Raises:
+            StorageError: If database operation fails
+            ValueError: If no valid fields provided for update
+        """
+        updates = {k: v for k, v in kwargs.items() if k in self.ALLOWED_FIELDS}
+        
+        if not updates:
+            raise ValueError(f"No valid fields to update. Allowed: {self.ALLOWED_FIELDS}")
+        
         with self._pool.connection() as conn:
             cursor = conn.cursor()
             
             try:
-                cursor.execute("SELECT id FROM memories WHERE id = ?", (memory_id,))
+                cursor.execute("BEGIN IMMEDIATE")
+                
+                cursor.execute(
+                    "SELECT 1 FROM memories WHERE id = ?",
+                    (memory_id,)
+                )
                 if not cursor.fetchone():
+                    cursor.execute("ROLLBACK")
                     return False
                 
                 timestamp = datetime.now().isoformat()
@@ -437,49 +502,86 @@ class UnifiedStorage:
                     VALUES (?, ?, ?, ?)
                 """, (EventType.MEMORY_UPDATED.value, json.dumps({
                     "memory_id": memory_id,
-                    **kwargs
+                    "updates": {k: v for k, v in updates.items() if k != 'content'}
                 }), timestamp, None))
                 
-                updates = []
-                values = []
+                set_clauses = []
+                params = []
                 
-                if "content" in kwargs:
-                    content = kwargs["content"]
-                    updates.append("content = ?")
-                    values.append(content)
-                    updates.append("content_tokenized = ?")
-                    values.append(" ".join(self._tokenize(content)))
-                    
-                if "metadata" in kwargs:
-                    updates.append("metadata = ?")
-                    values.append(json.dumps(kwargs["metadata"]))
-                    
-                if "tags" in kwargs:
-                    updates.append("tags = ?")
-                    values.append(json.dumps(kwargs["tags"]))
+                if 'content' in updates:
+                    content = updates['content']
+                    set_clauses.extend(['content = ?', 'content_tokenized = ?'])
+                    params.extend([content, ' '.join(self._tokenize(content))])
                 
-                if updates:
-                    updates.append("updated_at = ?")
-                    values.append(datetime.now().isoformat())
-                    values.append(memory_id)
-                    
-                    cursor.execute(
-                        f"UPDATE memories SET {', '.join(updates)} WHERE id = ?",
-                        values
-                    )
+                if 'metadata' in updates:
+                    set_clauses.append('metadata = ?')
+                    params.append(json.dumps(updates['metadata']))
                 
-                return cursor.rowcount > 0
+                if 'tags' in updates:
+                    set_clauses.append('tags = ?')
+                    params.append(json.dumps(updates['tags']))
+                
+                if 'priority' in updates:
+                    set_clauses.append('priority = ?')
+                    params.append(updates['priority'])
+                
+                set_clauses.append('updated_at = ?')
+                params.append(timestamp)
+                
+                for clause in set_clauses:
+                    if clause not in self.VALID_CLAUSES:
+                        raise ValueError(f"Invalid SQL clause generated: {clause}")
+                
+                params.append(memory_id)
+                
+                set_sql = ', '.join(set_clauses)
+                sql = f"UPDATE memories SET {set_sql} WHERE id = ?"
+                cursor.execute(sql, params)
+                
+                rows_affected = cursor.rowcount
+                
+                cursor.execute("COMMIT")
+                
+                return rows_affected > 0
+                
+            except sqlite3.IntegrityError as e:
+                cursor.execute("ROLLBACK")
+                raise StorageError(f"Data integrity error updating memory {memory_id}: {e}") from e
+            except sqlite3.OperationalError as e:
+                cursor.execute("ROLLBACK")
+                raise StorageError(f"Database operational error: {e}") from e
+            except ValueError:
+                cursor.execute("ROLLBACK")
+                raise
             except Exception as e:
-                raise StorageError(f"Failed to update memory: {e}")
+                cursor.execute("ROLLBACK")
+                raise StorageError(f"Unexpected error updating memory: {e}") from e
     
     def delete_memory(self, memory_id: int) -> bool:
-        """Delete a memory (atomic operation, returns True/False)"""
+        """
+        Delete a memory with atomic transaction.
+        
+        Args:
+            memory_id: The ID of memory to delete
+            
+        Returns:
+            bool: True if actually deleted, False if memory_id not found
+            
+        Raises:
+            StorageError: If database operation fails
+        """
         with self._pool.connection() as conn:
             cursor = conn.cursor()
             
             try:
-                cursor.execute("SELECT id FROM memories WHERE id = ?", (memory_id,))
+                cursor.execute("BEGIN IMMEDIATE")
+                
+                cursor.execute(
+                    "SELECT 1 FROM memories WHERE id = ?",
+                    (memory_id,)
+                )
                 if not cursor.fetchone():
+                    cursor.execute("ROLLBACK")
                     return False
                 
                 timestamp = datetime.now().isoformat()
@@ -493,9 +595,21 @@ class UnifiedStorage:
                 
                 cursor.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
                 
-                return cursor.rowcount > 0
+                rows_affected = cursor.rowcount
+                
+                cursor.execute("COMMIT")
+                
+                return rows_affected > 0
+                
+            except sqlite3.IntegrityError as e:
+                cursor.execute("ROLLBACK")
+                raise StorageError(f"Data integrity error deleting memory {memory_id}: {e}") from e
+            except sqlite3.OperationalError as e:
+                cursor.execute("ROLLBACK")
+                raise StorageError(f"Database operational error: {e}") from e
             except Exception as e:
-                raise StorageError(f"Failed to delete memory: {e}")
+                cursor.execute("ROLLBACK")
+                raise StorageError(f"Unexpected error deleting memory: {e}") from e
     
     def search(self, query: str, limit: int = 10, session_id: str = None) -> List[Dict]:
         """Search memories"""

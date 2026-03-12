@@ -218,3 +218,44 @@ class TestThreadSafety:
         assert init_count[0] == 1, f"_do_initialize() called {init_count[0]} times, expected 1"
         
         pool.close_all()
+
+
+class TestSecurityEnhancements:
+    """测试 v0.1.7 安全增强"""
+    
+    @pytest.fixture
+    def temp_storage(self):
+        tmpdir = tempfile.mkdtemp()
+        db_path = os.path.join(tmpdir, "test.db")
+        storage = UnifiedStorage(db_path=db_path)
+        yield storage
+        storage.close()
+        shutil.rmtree(tmpdir, ignore_errors=True)
+    
+    def test_invalid_field_rejected(self, temp_storage):
+        """测试非法字段被拒绝"""
+        memory_id = temp_storage.add_memory("test content")
+        
+        with pytest.raises(ValueError) as exc_info:
+            temp_storage.update_memory(memory_id, sql_injection="DROP TABLE memories")
+        
+        assert "No valid fields to update" in str(exc_info.value)
+    
+    def test_empty_update_rejected(self, temp_storage):
+        """测试空更新被拒绝"""
+        memory_id = temp_storage.add_memory("test content")
+        
+        with pytest.raises(ValueError) as exc_info:
+            temp_storage.update_memory(memory_id)
+        
+        assert "No valid fields to update" in str(exc_info.value)
+    
+    def test_update_nonexistent_returns_false(self, temp_storage):
+        """测试更新不存在的 memory 返回 False"""
+        result = temp_storage.update_memory(99999, content="new content")
+        assert result is False
+    
+    def test_delete_nonexistent_returns_false(self, temp_storage):
+        """测试删除不存在的 memory 返回 False"""
+        result = temp_storage.delete_memory(99999)
+        assert result is False
