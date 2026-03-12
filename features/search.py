@@ -26,7 +26,7 @@ class ChineseTokenizer:
         for word in words:
             word = word.strip()
             if len(word) > 0 and word not in STOPWORDS:
-                if re.match(r'^[\u4e00-\u9fa5a-zA-Z0-9]+$', word):
+                if re.match(r'^[\u4e00-\u9fa5a-zA-Z0-9\-._]+$', word):
                     tokens.append(word.lower())
         
         return tokens
@@ -79,7 +79,7 @@ class EnhancedSearch:
         try:
             if use_chinese_tokenizer:
                 tokens = ChineseTokenizer.tokenize(query)
-                fts_query = ' OR '.join(tokens)
+                fts_query = ' AND '.join(tokens)
             else:
                 tokens = query.split()
                 fts_query = query
@@ -90,8 +90,8 @@ class EnhancedSearch:
                        bm25(memories_fts) as score
                 FROM memories m
                 JOIN memories_fts fts ON m.id = fts.rowid
-                WHERE memories_fts MATCH ?
-                ORDER BY score
+                WHERE memories_fts MATCH ? AND bm25(memories_fts) < 0
+                ORDER BY score ASC
                 LIMIT ?
             """, (fts_query, limit))
             
@@ -187,7 +187,7 @@ class EnhancedSearch:
         
         try:
             tokens = ChineseTokenizer.tokenize(content_query)
-            fts_query = ' OR '.join(tokens)
+            fts_query = ' AND '.join(tokens)
             
             cursor.execute("""
                 SELECT m.id, m.type, m.content, m.metadata, m.tags, m.priority, 

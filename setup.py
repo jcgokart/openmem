@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as f:
 
 setup(
     name="openmem",
-    version="0.1.1",
+    version="0.1.3",
     author="jcgokart",
     author_email="",
     description="Memory System for AI-powered Development",
@@ -31,6 +31,7 @@ setup(
         "jieba>=0.42",
         "cryptography>=3.0",
         "requests>=2.28",
+        "sqlite-vec>=0.1.0",
     ],
     entry_points={
         "console_scripts": [

@@ -7,6 +7,7 @@ import sqlite3
 import json
 import os
 import threading
+import queue
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
@@ -15,15 +16,77 @@ import jieba
 from .base import MemoryBackend, MemoryType
 
 
+class ConnectionPool:
+    """Thread-safe SQLite connection pool"""
+    
+    def __init__(self, db_path: str, pool_size: int = 5, 
+                 wal_mode: bool = True, busy_timeout: int = 30000):
+        self.db_path = db_path
+        self.pool_size = pool_size
+        self.wal_mode = wal_mode
+        self.busy_timeout = busy_timeout
+        self._pool = queue.Queue(maxsize=pool_size)
+        self._lock = threading.Lock()
+        self._initialized = False
+        
+    def _create_connection(self) -> sqlite3.Connection:
+        """Create a new connection"""
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        conn = sqlite3.connect(
+            self.db_path,
+            check_same_thread=False,
+            timeout=30
+        )
+        conn.row_factory = sqlite3.Row
+        
+        cursor = conn.cursor()
+        cursor.execute(f"PRAGMA busy_timeout={self.busy_timeout}")
+        if self.wal_mode:
+            cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA temp_store=MEMORY")
+        cursor.execute("PRAGMA foreign_keys=ON")
+        
+        return conn
+    
+    def initialize(self):
+        """Initialize the pool"""
+        with self._lock:
+            if self._initialized:
+                return
+            for _ in range(self.pool_size):
+                conn = self._create_connection()
+                self._pool.put(conn)
+            self._initialized = True
+    
+    def get_connection(self) -> sqlite3.Connection:
+        """Get a connection from the pool"""
+        if not self._initialized:
+            self.initialize()
+        return self._pool.get()
+    
+    def return_connection(self, conn: sqlite3.Connection):
+        """Return a connection to the pool"""
+        self._pool.put(conn)
+    
+    def close_all(self):
+        """Close all connections"""
+        while not self._pool.empty():
+            conn = self._pool.get()
+            conn.close()
+
+
 class SQLiteConfig:
     """SQLite Config"""
 
     def __init__(self, db_path: str, enable_fts: bool = True,
-                 wal_mode: bool = True, busy_timeout: int = 30000):
+                 wal_mode: bool = True, busy_timeout: int = 30000,
+                 pool_size: int = 5):
         self.db_path = db_path
         self.enable_fts = enable_fts
         self.wal_mode = wal_mode
         self.busy_timeout = busy_timeout
+        self.pool_size = pool_size
 
 
 class SQLiteMemoryBackend(MemoryBackend):
@@ -35,38 +98,30 @@ class SQLiteMemoryBackend(MemoryBackend):
     - FTS5 full-text search (pre-tokenized storage)
     - Transaction support
     - Version control
+    - Connection pool for thread safety
     """
 
     def __init__(self, config: SQLiteConfig):
         self.config = config
-        self._local = threading.local()
+        self._pool = ConnectionPool(
+            db_path=config.db_path,
+            pool_size=config.pool_size,
+            wal_mode=config.wal_mode,
+            busy_timeout=config.busy_timeout
+        )
         self._init_database()
 
     def _get_connection(self) -> sqlite3.Connection:
-        """Get thread-local connection"""
-        if not hasattr(self._local, 'conn') or self._local.conn is None:
-            os.makedirs(os.path.dirname(self.config.db_path), exist_ok=True)
-            conn = sqlite3.connect(
-                self.config.db_path,
-                check_same_thread=False,
-                timeout=30
-            )
-            conn.row_factory = sqlite3.Row
-            self._local.conn = conn
-            self._configure_connection(conn)
-        return self._local.conn
+        """Get connection from pool"""
+        return self._pool.get_connection()
 
-    def _configure_connection(self, conn: sqlite3.Connection):
-        """Configure connection"""
-        cursor = conn.cursor()
-        cursor.execute(f"PRAGMA busy_timeout={self.config.busy_timeout}")
+    def _return_connection(self, conn: sqlite3.Connection):
+        """Return connection to pool"""
+        self._pool.return_connection(conn)
 
-        if self.config.wal_mode:
-            cursor.execute("PRAGMA journal_mode=WAL")
-
-        cursor.execute("PRAGMA synchronous=NORMAL")
-        cursor.execute("PRAGMA temp_store=MEMORY")
-        cursor.execute("PRAGMA foreign_keys=ON")
+    def close(self):
+        """Close all connections"""
+        self._pool.close_all()
 
     def _init_database(self):
         """Initialize database"""
@@ -280,19 +335,20 @@ class SQLiteMemoryBackend(MemoryBackend):
         try:
             tokens = list(jieba.cut(query))
             tokens = [t.strip().lower() for t in tokens if t.strip()]
-            fts_query = ' OR '.join(tokens)
+            fts_query = ' AND '.join(tokens)
             
             cursor.execute("""
                 SELECT m.id, m.type, m.content, m.metadata, m.tags, m.priority, 
-                       m.created_at, m.updated_at, m.expires_at, m.version
+                       m.created_at, m.updated_at, m.expires_at, m.version,
+                       bm25(memories_fts) as score
                 FROM memories m
                 JOIN memories_fts fts ON m.id = fts.rowid
-                WHERE memories_fts MATCH ?
-                ORDER BY bm25(memories_fts)
+                WHERE memories_fts MATCH ? AND bm25(memories_fts) < 0
+                ORDER BY score ASC
                 LIMIT ?
             """, (fts_query, limit))
             
-            return [self._row_to_dict(row) for row in cursor.fetchall()]
+            return [self._row_to_dict(row[:10]) for row in cursor.fetchall()]
             
         except sqlite3.OperationalError as e:
             error_msg = str(e).lower()
@@ -424,9 +480,3 @@ class SQLiteMemoryBackend(MemoryBackend):
         by_type = {row[0]: row[1] for row in cursor.fetchall()}
         
         return {"total": total, "by_type": by_type}
-    
-    def close(self):
-        """Close connection"""
-        if hasattr(self._local, 'conn') and self._local.conn:
-            self._local.conn.close()
-            self._local.conn = None

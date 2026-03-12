@@ -8,6 +8,7 @@ import json
 import hashlib
 import shutil
 import sqlite3
+import secrets
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
@@ -21,23 +22,22 @@ class EncryptionError(Exception):
 
 
 class CryptoManager:
-    """Encryption manager"""
+    """Encryption manager with secure random salt"""
     
     def __init__(self, key: Optional[str] = None):
         """Initialize encryption manager"""
         self.key = key or os.environ.get('MEMORY_ENCRYPTION_KEY')
         if not self.key:
-            import secrets
             self.key = secrets.token_hex(32)
-            print(f"⚠️ No encryption key set, generated: {self.key[:8]}...")
+            print(f"⚠️ No encryption key set, generated: {self.key}")
+            print("⚠️ Please save this key securely! You will need it to decrypt your data.")
     
-    def _get_cipher(self):
-        """Get cipher with PBKDF2 key derivation"""
+    def _get_cipher(self, salt: bytes):
+        """Get cipher with PBKDF2 key derivation using provided salt"""
         from cryptography.fernet import Fernet
         from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
         from cryptography.hazmat.primitives import hashes
         
-        salt = b'memory_system_salt_v1'
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
@@ -48,13 +48,14 @@ class CryptoManager:
         return Fernet(key)
     
     def encrypt(self, data: str) -> str:
-        """Encrypt data"""
+        """Encrypt data with random salt"""
         if not self.key:
             raise EncryptionError("No encryption key set")
         
-        cipher = self._get_cipher()
+        salt = secrets.token_bytes(16)
+        cipher = self._get_cipher(salt)
         encrypted = cipher.encrypt(data.encode())
-        return base64.b64encode(encrypted).decode()
+        return base64.b64encode(salt + encrypted).decode()
     
     def decrypt(self, encrypted_data: str) -> str:
         """Decrypt data"""
@@ -62,29 +63,52 @@ class CryptoManager:
             raise EncryptionError("No encryption key set")
         
         try:
-            cipher = self._get_cipher()
             decoded = base64.b64decode(encrypted_data.encode())
-            decrypted = cipher.decrypt(decoded)
+            salt = decoded[:16]
+            encrypted = decoded[16:]
+            cipher = self._get_cipher(salt)
+            decrypted = cipher.decrypt(encrypted)
             return decrypted.decode()
         except Exception as e:
             raise EncryptionError(f"Decryption failed: {e}")
     
-    def encrypt_dict(self, data: dict) -> dict:
-        """Encrypt dictionary"""
-        json_data = json.dumps(data, ensure_ascii=False)
-        encrypted = self.encrypt(json_data)
-        return {
-            "_encrypted": True,
-            "data": encrypted
-        }
+    def encrypt_dict(self, data: dict, sensitive_fields: List[str] = None) -> dict:
+        """Encrypt dictionary with optional field-level encryption"""
+        if sensitive_fields is None:
+            json_data = json.dumps(data, ensure_ascii=False)
+            encrypted = self.encrypt(json_data)
+            return {
+                "_encrypted": True,
+                "data": encrypted
+            }
+        
+        result = {}
+        for key, value in data.items():
+            if key in sensitive_fields:
+                result[key] = self.encrypt(json.dumps(value))
+                result[f"_{key}_encrypted"] = True
+            else:
+                result[key] = value
+        return result
     
-    def decrypt_dict(self, encrypted_data: dict) -> dict:
+    def decrypt_dict(self, encrypted_data: dict, sensitive_fields: List[str] = None) -> dict:
         """Decrypt dictionary"""
-        if not encrypted_data.get("_encrypted"):
+        if encrypted_data.get("_encrypted"):
+            decrypted = self.decrypt(encrypted_data["data"])
+            return json.loads(decrypted)
+        
+        if sensitive_fields is None:
             return encrypted_data
         
-        decrypted = self.decrypt(encrypted_data["data"])
-        return json.loads(decrypted)
+        result = {}
+        for key, value in encrypted_data.items():
+            if key.startswith("_") and key.endswith("_encrypted"):
+                continue
+            if f"_{key}_encrypted" in encrypted_data:
+                result[key] = json.loads(self.decrypt(value))
+            else:
+                result[key] = value
+        return result
 
 
 class BackupType(Enum):
